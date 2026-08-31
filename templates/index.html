@@ -3886,6 +3886,9 @@ input {
             &lt;/p&gt;
 &lt;/article&gt;
 &lt;/section&gt;
+&lt;div style=&quot;text-align:center;margin:18px 0 8px;font-size:11px;color:#666;&quot;&gt;
+    Need help? Contact us at &lt;a href=&quot;mailto:foodlens.contact@gmail.com&quot; style=&quot;color:#39AFA5;font-weight:800;text-decoration:none;&quot;&gt;foodlens.contact@gmail.com&lt;/a&gt;
+&lt;/div&gt;
 &lt;/main&gt;
 &lt;!-- =====================================================
      BOTTOM NAVIGATION
@@ -8678,42 +8681,6 @@ Make a choice that works for you.
 &lt;/div&gt;
 &lt;/div&gt;
 &lt;!-- =====================================================
-     DYNAMIC INGREDIENT SIMPLIFIER
-===================================================== --&gt;
-&lt;section class=&quot;simplifier&quot;&gt;
-&lt;div class=&quot;simplifierHeader&quot;&gt;
-&lt;h3&gt;
-        MAKE THE LABEL SIMPLE
-    &lt;/h3&gt;
-&lt;button class=&quot;smallBtn&quot; id=&quot;readTermsButton&quot; onclick=&quot;readSimplifiedTerms()&quot;&gt;
-
-        Read aloud
-
-    &lt;/button&gt;
-&lt;button class=&quot;smallBtn&quot; id=&quot;explainTermsButton&quot; type=&quot;button&quot; onclick=&quot;explainDifficultTerms()&quot;&gt;
-
-        Explain difficult terms
-
-    &lt;/button&gt;
-&lt;/div&gt;
-&lt;p class=&quot;simplifierIntro&quot;&gt;
-
-FoodLens only shows explanations
-for difficult ingredients actually
-found in this product.
-
-&lt;/p&gt;
-&lt;div id=&quot;termResults&quot;&gt;
-&lt;div class=&quot;noTerms&quot;&gt;
-
-        Scan a product to see
-        difficult ingredients explained
-        in simple language.
-
-    &lt;/div&gt;
-&lt;/div&gt;
-&lt;/section&gt;
-&lt;!-- =====================================================
      BETTER CHOICE
 ===================================================== --&gt;
 &lt;div class=&quot;sectionTitle&quot;&gt;
@@ -9868,6 +9835,15 @@ function showHistory(){
 ===================================================== */
 
 function positiveFeedback(){
+
+    const a=JSON.parse(localStorage.getItem(&quot;foodlensFeedbackLoop&quot;)||&quot;[]&quot;);
+    a.unshift({
+        message:&quot;Yes — this information was useful.&quot;,
+        product:document.getElementById(&quot;productName&quot;)?.innerText||&quot;Scanned product&quot;,
+        barcode:localStorage.getItem(&quot;foodlensLastBarcode&quot;)||&quot;&quot;,
+        date:new Date().toISOString()
+    });
+    localStorage.setItem(&quot;foodlensFeedbackLoop&quot;,JSON.stringify(a.slice(0,50)));
 
     showToast(
     &quot;Thank you! Your feedback helps improve FoodLens.&quot;
