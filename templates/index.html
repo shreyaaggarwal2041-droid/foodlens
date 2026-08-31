@@ -15215,3 +15215,195 @@ if(frame)frame.addEventListener("load",function(){
 
 })();
 </script>
+
+
+<script id="foodlensFinalResultOnlyBridge">
+(function(){
+  "use strict";
+
+  /*
+   * FINAL RESULT-ONLY BRIDGE.
+   * The camera/scanner UI is NOT changed here.
+   * This only guarantees that a successfully captured barcode reaches
+   * Flask /get_food_data and the existing result page.
+   */
+
+  var lastCode = "";
+  var busy = false;
+
+  function digits(v){
+    return String(v == null ? "" : v).replace(/\D/g, "");
+  }
+
+  function valid(code){
+    return /^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(code);
+  }
+
+  function resultFrame(){
+    try { return document.getElementById("frame-result")?.contentWindow || null; }
+    catch(e){ return null; }
+  }
+
+  function showResult(){
+    try { window.foodLensShow?.("result"); } catch(e){}
+  }
+
+  function render(product, code){
+    var rw = resultFrame();
+    if(!rw || !rw.document) return false;
+
+    if(typeof rw.displayProduct !== "function") return false;
+
+    try {
+      rw.displayProduct(product);
+
+      var d = rw.document;
+      var barcode = d.getElementById("scannedBarcode");
+      if(barcode) barcode.textContent = "Barcode: " + code;
+
+      return true;
+    } catch(e){
+      console.error("[FoodLens] result render failed", e);
+      return false;
+    }
+  }
+
+  function normalize(data, code){
+    data = data || {};
+    var p = data.product && typeof data.product === "object" ? data.product : data;
+    var n = p.nutrition || p.nutriments || {};
+    var f = p.foodlens || {};
+    var h = p.health_assessment || {};
+
+    function num(v){
+      if(v === null || v === undefined || v === "") return null;
+      var x = Number(v);
+      return Number.isFinite(x) ? x : null;
+    }
+
+    var sugar = num(n.sugar_g_100g ?? n.sugars_100g ?? n.sugars ?? n.sugar_g);
+    var sodium = num(n.sodium_mg_100g ?? n.sodium_mg);
+    var fibre = num(n.dietary_fiber_g_100g ?? n.fiber_g_100g ?? n.fibre_g_100g ?? n.fiber_g ?? n.fibre_g);
+    var protein = num(n.protein_g_100g ?? n.proteins_100g ?? n.protein_g);
+
+    var score = f.score ?? h.score ?? p.score ?? p.nutriscore ?? p.nutriscore_grade ?? "—";
+
+    return {
+      barcode: p.barcode || p.code || code,
+      name: p.name || p.product_name || p.product_name_en || "Product information unavailable",
+      brand: p.brand || p.brands || "Food product",
+      image: p.image || p.image_front_url || p.image_front_small_url || p.image_url || "",
+      score: score,
+      scoreCategory: f.category || h.category || "",
+      recommendation: f.recommendation || p.recommendation || "",
+      nutrition: {
+        sugar: sugar === null ? "—" : sugar.toFixed(1) + "g",
+        sodium: sodium === null ? "—" : Math.round(sodium) + "mg",
+        fibre: fibre === null ? "—" : fibre.toFixed(1) + "g",
+        protein: protein === null ? "—" : protein.toFixed(1) + "g"
+      },
+      ingredients: p.ingredients || p.ingredients_text || p.ingredients_text_en || "",
+      backend: p
+    };
+  }
+
+  async function handleBarcode(value){
+    var code = digits(value);
+    if(!valid(code)) return;
+    if(busy && code === lastCode) return;
+
+    lastCode = code;
+    busy = true;
+
+    try { localStorage.setItem("foodlensLastBarcode", code); } catch(e){}
+
+    showResult();
+
+    /* Wait for the result iframe to become visible/ready. */
+    var loading = {
+      barcode: code,
+      name: "Loading product information…",
+      brand: "Barcode: " + code,
+      image: "",
+      score: "—",
+      nutrition: {sugar:"—", sodium:"—", fibre:"—", protein:"—"},
+      ingredients: ""
+    };
+
+    var rendered = false;
+    for(var i=0; i<20 && !rendered; i++){
+      rendered = render(loading, code);
+      if(!rendered) await new Promise(r => setTimeout(r, 100));
+    }
+
+    try{
+      var response = await fetch(
+        "/get_food_data?query=" + encodeURIComponent(code),
+        {
+          method: "GET",
+          headers: {"Accept":"application/json"},
+          cache: "no-store"
+        }
+      );
+
+      var data = null;
+      try { data = await response.json(); } catch(e){}
+
+      if(!response.ok){
+        throw new Error(data?.error || ("Backend returned HTTP " + response.status));
+      }
+
+      var product = normalize(data, code);
+
+      /* Retry rendering so an iframe reload can never leave Waiting for scan. */
+      for(var j=0; j<20; j++){
+        if(render(product, code)) break;
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+    }catch(error){
+      console.error("[FoodLens] Flask product lookup failed:", error);
+
+      var failed = {
+        barcode: code,
+        name: "Product information unavailable",
+        brand: "Barcode: " + code,
+        image: "",
+        score: "—",
+        nutrition: {sugar:"—", sodium:"—", fibre:"—", protein:"—"},
+        ingredients: "",
+        backendError: error.message || String(error)
+      };
+
+      render(failed, code);
+    } finally {
+      busy = false;
+    }
+  }
+
+  /* Any scanner implementation that posts its successful barcode is handled here. */
+  window.addEventListener("message", function(e){
+    var d = e.data || {};
+    if(d.type === "foodlens-barcode" && d.barcode){
+      handleBarcode(d.barcode);
+    }
+  });
+
+  /* Direct hook for the existing home scanner/manual entry. */
+  function bindHome(){
+    try{
+      var home = document.getElementById("frame-home")?.contentWindow;
+      if(!home) return;
+      home.processBarcode = function(value){ handleBarcode(value); };
+      home.foodLensHandleBarcode = function(value){ handleBarcode(value); };
+    }catch(e){}
+  }
+
+  bindHome();
+  document.getElementById("frame-home")?.addEventListener("load", bindHome);
+  setInterval(bindHome, 500);
+
+  /* Also expose one stable top-level hook without altering the scanner itself. */
+  window.foodLensHandleBarcode = handleBarcode;
+})();
+</script>
