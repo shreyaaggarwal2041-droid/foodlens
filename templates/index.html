@@ -10602,6 +10602,293 @@ document.addEventListener("keydown",foodLensIntroAfterInteraction);
  };
 })();
 </script>
+
+<script id="foodlensKeepOriginalLayoutBarcodeFix">
+(function(){
+  "use strict";
+
+  /*
+   * FINAL FUNCTIONAL FIX ONLY.
+   * Keep the user's original FoodLens layout/screens/modals.
+   * Do not introduce a replacement scanner UI.
+   *
+   * Flow:
+   * existing Home barcode/tutorial UI
+   * -> phone camera/file capture
+   * -> ZXing decodes the captured barcode image
+   * -> existing processBarcode()
+   * -> existing Flask/backend product-information pipeline
+   * -> existing Result screen
+   */
+
+  function closeInjectedScannerUIs(){
+    /* Older experimental scanner layers in this file are disabled visually.
+       They are never used as the scanner entry point anymore. */
+    [
+      "foodlensAuthoritativeScanner",
+      "flHardScanner"
+    ].forEach(function(id){
+      var e=document.getElementById(id);
+      if(e){
+        e.classList.remove("show");
+        e.setAttribute("aria-hidden","true");
+        e.style.display="none";
+      }
+    });
+
+    /* Stop any camera tracks opened by the old experimental layers. */
+    [
+      "foodlensAuthoritativeVideo",
+      "flHardVideo"
+    ].forEach(function(id){
+      var v=document.getElementById(id);
+      try{
+        var s=v && v.srcObject;
+        if(s && s.getTracks) s.getTracks().forEach(function(t){try{t.stop()}catch(e){}});
+        if(v) v.srcObject=null;
+      }catch(e){}
+    });
+  }
+
+  function digits(v){
+    return String(v==null?"":v).replace(/\D/g,"");
+  }
+
+  function validBarcode(v){
+    var c=digits(v);
+    return /^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(c);
+  }
+
+  async function loadZXing(w){
+    if(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader) return true;
+
+    return new Promise(function(resolve){
+      var old=w.document.querySelector('script[data-foodlens-zxing-fix="1"]');
+      if(old){
+        if(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader){
+          resolve(true); return;
+        }
+        old.addEventListener("load",function(){
+          resolve(!!(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader));
+        },{once:true});
+        setTimeout(function(){
+          resolve(!!(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader));
+        },6000);
+        return;
+      }
+
+      var s=w.document.createElement("script");
+      s.dataset.foodlensZxingFix="1";
+      s.src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0";
+      s.onload=function(){
+        resolve(!!(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader));
+      };
+      s.onerror=function(){resolve(false)};
+      w.document.head.appendChild(s);
+    });
+  }
+
+  async function decodePhoto(w,file){
+    /* Native decoder first where available. */
+    try{
+      if("BarcodeDetector" in w){
+        var detector;
+        try{
+          detector=new w.BarcodeDetector({
+            formats:[
+              "ean_13","ean_8","upc_a","upc_e",
+              "code_128","code_39","itf","itf_14","codabar"
+            ]
+          });
+        }catch(e){
+          detector=new w.BarcodeDetector();
+        }
+
+        var bitmap=await w.createImageBitmap(file);
+        var hits=await detector.detect(bitmap);
+        try{bitmap.close()}catch(e){}
+        if(hits && hits.length && validBarcode(hits[0].rawValue)){
+          return digits(hits[0].rawValue);
+        }
+      }
+    }catch(e){
+      console.warn("[FoodLens] Native barcode decode failed",e);
+    }
+
+    /* ZXing is the important fallback: it reliably handles retail
+       EAN/UPC-style 1-D barcodes from a captured image. */
+    try{
+      if(await loadZXing(w)){
+        var R=w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader;
+        if(R){
+          var reader=new R();
+          var url=w.URL.createObjectURL(file);
+
+          try{
+            if(typeof reader.decodeFromImageUrl==="function"){
+              var result=await reader.decodeFromImageUrl(url);
+              var c=result && result.getText ? digits(result.getText()) : "";
+              if(validBarcode(c)) return c;
+            }
+
+            if(typeof reader.decodeFromImageElement==="function"){
+              var img=w.document.createElement("img");
+              img.src=url;
+              await new Promise(function(resolve,reject){
+                img.onload=resolve;
+                img.onerror=reject;
+              });
+              var result2=await reader.decodeFromImageElement(img);
+              var c2=result2 && result2.getText ? digits(result2.getText()) : "";
+              if(validBarcode(c2)) return c2;
+            }
+          }finally{
+            try{w.URL.revokeObjectURL(url)}catch(e){}
+            try{reader.reset?.()}catch(e){}
+          }
+        }
+      }
+    }catch(e){
+      console.warn("[FoodLens] ZXing photo decode failed",e);
+    }
+
+    return "";
+  }
+
+  function installHome(){
+    var frame=document.getElementById("frame-home");
+    var w=frame && frame.contentWindow;
+    if(!w || !w.document) return false;
+
+    /*
+     * CAMERA:
+     * Restore the original user's camera entry point.
+     * It uses the existing hidden cameraInput with capture="environment";
+     * therefore no new scanner screen/layout is created.
+     */
+    w.openCamera=function(){
+      closeInjectedScannerUIs();
+      var input=w.document.getElementById("cameraInput");
+      if(input){
+        input.value="";
+        input.click();
+      }
+    };
+
+    /*
+     * BARCODE TUTORIAL:
+     * Keep the original barcode tutorial modal exactly as designed.
+     */
+    w.openBarcode=function(){
+      var modal=w.document.getElementById("barcodeModal");
+      if(modal) modal.classList.add("show");
+      try{w.stopHomeAudio?.()}catch(e){}
+    };
+
+    w.startBarcodeScannerFromTutorial=function(){
+      try{
+        var modal=w.document.getElementById("barcodeModal");
+        if(modal) modal.classList.remove("show");
+      }catch(e){}
+
+      setTimeout(function(){
+        w.openCamera();
+      },80);
+    };
+
+    /*
+     * PHOTO/CAMERA RESULT:
+     * Decode the actual image instead of opening the old demo product.
+     */
+    w.photoSelected=async function(input){
+      if(!input || !input.files || !input.files.length) return;
+
+      var file=input.files[0];
+      var hi=(localStorage.getItem("foodlensLanguage")||"en")==="hi";
+
+      try{
+        w.showToast?.(hi
+          ?"बारकोड पढ़ा जा रहा है…"
+          :"Reading barcode…");
+      }catch(e){}
+
+      var code=await decodePhoto(w,file);
+
+      if(validBarcode(code)){
+        try{localStorage.setItem("foodlensLastBarcode",code)}catch(e){}
+
+        try{
+          if(typeof w.processBarcode==="function"){
+            await w.processBarcode(code);
+          }else if(w.parent!==w){
+            w.parent.postMessage({
+              type:"foodlens-barcode",
+              barcode:code
+            },"*");
+          }
+        }catch(e){
+          console.error("[FoodLens] processBarcode failed",e);
+        }
+        return;
+      }
+
+      try{
+        w.showToast?.(hi
+          ?"बारकोड नहीं मिला। कृपया साफ और सीधी फोटो लें।"
+          :"Barcode not detected. Please take a clear, straight photo of the barcode.");
+      }catch(e){}
+    };
+
+    return true;
+  }
+
+  /*
+   * The bottom navigation's Scan action should open the user's existing
+   * barcode tutorial, not any replacement scanner overlay.
+   */
+  window.addEventListener("message",function(e){
+    var d=e.data||{};
+    if(d.type==="foodlens-nav" && d.screen==="scan"){
+      closeInjectedScannerUIs();
+      setTimeout(function(){
+        var frame=document.getElementById("frame-home");
+        var w=frame && frame.contentWindow;
+        if(w && typeof w.openBarcode==="function") w.openBarcode();
+      },50);
+    }
+  },true);
+
+  function install(){
+    try{
+      return installHome();
+    }catch(e){
+      console.error("[FoodLens] layout-preserving barcode fix:",e);
+      return false;
+    }
+  }
+
+  install();
+
+  var frame=document.getElementById("frame-home");
+  if(frame){
+    frame.addEventListener("load",function(){
+      install();
+      setTimeout(install,100);
+      setTimeout(install,500);
+      setTimeout(install,1200);
+    });
+  }
+
+  /* Small startup retry because the Home iframe may load asynchronously. */
+  var tries=0;
+  var timer=setInterval(function(){
+    tries++;
+    if(install() || tries>15) clearInterval(timer);
+  },250);
+
+})();
+</script>
+
 </body></html>
 <style>
 #foodlensLanguageModal{position:fixed;inset:0;z-index:200000;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:Arial,sans-serif}
@@ -11319,6 +11606,293 @@ window.addEventListener("message",function(e){
 });
 
 window.__FOODLENS_NUMBER_SCANNER=start;
+
+})();
+</script>
+
+
+<script id="foodlensKeepOriginalLayoutBarcodeFix">
+(function(){
+  "use strict";
+
+  /*
+   * FINAL FUNCTIONAL FIX ONLY.
+   * Keep the user's original FoodLens layout/screens/modals.
+   * Do not introduce a replacement scanner UI.
+   *
+   * Flow:
+   * existing Home barcode/tutorial UI
+   * -> phone camera/file capture
+   * -> ZXing decodes the captured barcode image
+   * -> existing processBarcode()
+   * -> existing Flask/backend product-information pipeline
+   * -> existing Result screen
+   */
+
+  function closeInjectedScannerUIs(){
+    /* Older experimental scanner layers in this file are disabled visually.
+       They are never used as the scanner entry point anymore. */
+    [
+      "foodlensAuthoritativeScanner",
+      "flHardScanner"
+    ].forEach(function(id){
+      var e=document.getElementById(id);
+      if(e){
+        e.classList.remove("show");
+        e.setAttribute("aria-hidden","true");
+        e.style.display="none";
+      }
+    });
+
+    /* Stop any camera tracks opened by the old experimental layers. */
+    [
+      "foodlensAuthoritativeVideo",
+      "flHardVideo"
+    ].forEach(function(id){
+      var v=document.getElementById(id);
+      try{
+        var s=v && v.srcObject;
+        if(s && s.getTracks) s.getTracks().forEach(function(t){try{t.stop()}catch(e){}});
+        if(v) v.srcObject=null;
+      }catch(e){}
+    });
+  }
+
+  function digits(v){
+    return String(v==null?"":v).replace(/\D/g,"");
+  }
+
+  function validBarcode(v){
+    var c=digits(v);
+    return /^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(c);
+  }
+
+  async function loadZXing(w){
+    if(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader) return true;
+
+    return new Promise(function(resolve){
+      var old=w.document.querySelector('script[data-foodlens-zxing-fix="1"]');
+      if(old){
+        if(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader){
+          resolve(true); return;
+        }
+        old.addEventListener("load",function(){
+          resolve(!!(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader));
+        },{once:true});
+        setTimeout(function(){
+          resolve(!!(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader));
+        },6000);
+        return;
+      }
+
+      var s=w.document.createElement("script");
+      s.dataset.foodlensZxingFix="1";
+      s.src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0";
+      s.onload=function(){
+        resolve(!!(w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader));
+      };
+      s.onerror=function(){resolve(false)};
+      w.document.head.appendChild(s);
+    });
+  }
+
+  async function decodePhoto(w,file){
+    /* Native decoder first where available. */
+    try{
+      if("BarcodeDetector" in w){
+        var detector;
+        try{
+          detector=new w.BarcodeDetector({
+            formats:[
+              "ean_13","ean_8","upc_a","upc_e",
+              "code_128","code_39","itf","itf_14","codabar"
+            ]
+          });
+        }catch(e){
+          detector=new w.BarcodeDetector();
+        }
+
+        var bitmap=await w.createImageBitmap(file);
+        var hits=await detector.detect(bitmap);
+        try{bitmap.close()}catch(e){}
+        if(hits && hits.length && validBarcode(hits[0].rawValue)){
+          return digits(hits[0].rawValue);
+        }
+      }
+    }catch(e){
+      console.warn("[FoodLens] Native barcode decode failed",e);
+    }
+
+    /* ZXing is the important fallback: it reliably handles retail
+       EAN/UPC-style 1-D barcodes from a captured image. */
+    try{
+      if(await loadZXing(w)){
+        var R=w.ZXingBrowser && w.ZXingBrowser.BrowserMultiFormatReader;
+        if(R){
+          var reader=new R();
+          var url=w.URL.createObjectURL(file);
+
+          try{
+            if(typeof reader.decodeFromImageUrl==="function"){
+              var result=await reader.decodeFromImageUrl(url);
+              var c=result && result.getText ? digits(result.getText()) : "";
+              if(validBarcode(c)) return c;
+            }
+
+            if(typeof reader.decodeFromImageElement==="function"){
+              var img=w.document.createElement("img");
+              img.src=url;
+              await new Promise(function(resolve,reject){
+                img.onload=resolve;
+                img.onerror=reject;
+              });
+              var result2=await reader.decodeFromImageElement(img);
+              var c2=result2 && result2.getText ? digits(result2.getText()) : "";
+              if(validBarcode(c2)) return c2;
+            }
+          }finally{
+            try{w.URL.revokeObjectURL(url)}catch(e){}
+            try{reader.reset?.()}catch(e){}
+          }
+        }
+      }
+    }catch(e){
+      console.warn("[FoodLens] ZXing photo decode failed",e);
+    }
+
+    return "";
+  }
+
+  function installHome(){
+    var frame=document.getElementById("frame-home");
+    var w=frame && frame.contentWindow;
+    if(!w || !w.document) return false;
+
+    /*
+     * CAMERA:
+     * Restore the original user's camera entry point.
+     * It uses the existing hidden cameraInput with capture="environment";
+     * therefore no new scanner screen/layout is created.
+     */
+    w.openCamera=function(){
+      closeInjectedScannerUIs();
+      var input=w.document.getElementById("cameraInput");
+      if(input){
+        input.value="";
+        input.click();
+      }
+    };
+
+    /*
+     * BARCODE TUTORIAL:
+     * Keep the original barcode tutorial modal exactly as designed.
+     */
+    w.openBarcode=function(){
+      var modal=w.document.getElementById("barcodeModal");
+      if(modal) modal.classList.add("show");
+      try{w.stopHomeAudio?.()}catch(e){}
+    };
+
+    w.startBarcodeScannerFromTutorial=function(){
+      try{
+        var modal=w.document.getElementById("barcodeModal");
+        if(modal) modal.classList.remove("show");
+      }catch(e){}
+
+      setTimeout(function(){
+        w.openCamera();
+      },80);
+    };
+
+    /*
+     * PHOTO/CAMERA RESULT:
+     * Decode the actual image instead of opening the old demo product.
+     */
+    w.photoSelected=async function(input){
+      if(!input || !input.files || !input.files.length) return;
+
+      var file=input.files[0];
+      var hi=(localStorage.getItem("foodlensLanguage")||"en")==="hi";
+
+      try{
+        w.showToast?.(hi
+          ?"बारकोड पढ़ा जा रहा है…"
+          :"Reading barcode…");
+      }catch(e){}
+
+      var code=await decodePhoto(w,file);
+
+      if(validBarcode(code)){
+        try{localStorage.setItem("foodlensLastBarcode",code)}catch(e){}
+
+        try{
+          if(typeof w.processBarcode==="function"){
+            await w.processBarcode(code);
+          }else if(w.parent!==w){
+            w.parent.postMessage({
+              type:"foodlens-barcode",
+              barcode:code
+            },"*");
+          }
+        }catch(e){
+          console.error("[FoodLens] processBarcode failed",e);
+        }
+        return;
+      }
+
+      try{
+        w.showToast?.(hi
+          ?"बारकोड नहीं मिला। कृपया साफ और सीधी फोटो लें।"
+          :"Barcode not detected. Please take a clear, straight photo of the barcode.");
+      }catch(e){}
+    };
+
+    return true;
+  }
+
+  /*
+   * The bottom navigation's Scan action should open the user's existing
+   * barcode tutorial, not any replacement scanner overlay.
+   */
+  window.addEventListener("message",function(e){
+    var d=e.data||{};
+    if(d.type==="foodlens-nav" && d.screen==="scan"){
+      closeInjectedScannerUIs();
+      setTimeout(function(){
+        var frame=document.getElementById("frame-home");
+        var w=frame && frame.contentWindow;
+        if(w && typeof w.openBarcode==="function") w.openBarcode();
+      },50);
+    }
+  },true);
+
+  function install(){
+    try{
+      return installHome();
+    }catch(e){
+      console.error("[FoodLens] layout-preserving barcode fix:",e);
+      return false;
+    }
+  }
+
+  install();
+
+  var frame=document.getElementById("frame-home");
+  if(frame){
+    frame.addEventListener("load",function(){
+      install();
+      setTimeout(install,100);
+      setTimeout(install,500);
+      setTimeout(install,1200);
+    });
+  }
+
+  /* Small startup retry because the Home iframe may load asynchronously. */
+  var tries=0;
+  var timer=setInterval(function(){
+    tries++;
+    if(install() || tries>15) clearInterval(timer);
+  },250);
 
 })();
 </script>
