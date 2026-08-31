@@ -3887,9 +3887,6 @@ input {
 &lt;/article&gt;
 &lt;/section&gt;
 &lt;/main&gt;
-&lt;div style=&quot;text-align:center;margin:18px 0 8px;font-size:11px;color:#666;&quot;&gt;
-    Need help? Contact us at &lt;a href=&quot;mailto:foodlens.contact@gmail.com&quot; style=&quot;color:#39AFA5;font-weight:800;text-decoration:none;&quot;&gt;foodlens.contact@gmail.com&lt;/a&gt;
-&lt;/div&gt;
 &lt;!-- =====================================================
      BOTTOM NAVIGATION
 ===================================================== --&gt;
@@ -8681,6 +8678,37 @@ Make a choice that works for you.
 &lt;/div&gt;
 &lt;/div&gt;
 &lt;!-- =====================================================
+     DYNAMIC INGREDIENT SIMPLIFIER
+===================================================== --&gt;
+&lt;section class=&quot;simplifier&quot;&gt;
+&lt;div class=&quot;simplifierHeader&quot;&gt;
+&lt;h3&gt;
+        MAKE THE LABEL SIMPLE
+    &lt;/h3&gt;
+&lt;button class=&quot;smallBtn&quot; onclick=&quot;readSimplifiedTerms()&quot;&gt;
+
+        Read aloud
+
+    &lt;/button&gt;
+&lt;/div&gt;
+&lt;p class=&quot;simplifierIntro&quot;&gt;
+
+FoodLens only shows explanations
+for difficult ingredients actually
+found in this product.
+
+&lt;/p&gt;
+&lt;div id=&quot;termResults&quot;&gt;
+&lt;div class=&quot;noTerms&quot;&gt;
+
+        Scan a product to see
+        difficult ingredients explained
+        in simple language.
+
+    &lt;/div&gt;
+&lt;/div&gt;
+&lt;/section&gt;
+&lt;!-- =====================================================
      BETTER CHOICE
 ===================================================== --&gt;
 &lt;div class=&quot;sectionTitle&quot;&gt;
@@ -9433,7 +9461,6 @@ function findDifficultTerms(
 
 function displayProduct(product){
     product = product || {};
-    window.foodLensCurrentProduct = product;
     product.nutrition = product.nutrition || {
         sugar: product.sugar ?? "—",
         sodium: product.sodium ?? "—",
@@ -9664,7 +9691,7 @@ function renderTerms(
 function readSimplifiedTerms(){
 
     const product =
-    window.foodLensCurrentProduct || {};
+    sampleProduct;
 
 
     const matches =
@@ -9836,17 +9863,6 @@ function showHistory(){
 
 function positiveFeedback(){
 
-    try{
-      const a=JSON.parse(localStorage.getItem(&quot;foodlensFeedbackLoop&quot;)||&quot;[]&quot;);
-      a.unshift({
-        message:&quot;Yes — this information was useful.&quot;,
-        product:document.getElementById(&quot;productName&quot;)?.innerText||&quot;Scanned product&quot;,
-        barcode:localStorage.getItem(&quot;foodlensLastBarcode&quot;)||&quot;&quot;,
-        date:new Date().toISOString()
-      });
-      localStorage.setItem(&quot;foodlensFeedbackLoop&quot;,JSON.stringify(a.slice(0,50)));
-    }catch(e){}
-
     showToast(
     &quot;Thank you! Your feedback helps improve FoodLens.&quot;
     );
@@ -9855,12 +9871,14 @@ function positiveFeedback(){
 
 
 function showFeedback(){
-    const form=document.getElementById(&quot;feedbackForm&quot;);
-    if(!form)return;
-    form.classList.add(&quot;show&quot;);
-    form.style.display=&quot;block&quot;;
-    const box=document.getElementById(&quot;feedbackText&quot;);
-    if(box)box.focus();
+
+    document
+    .getElementById(
+        &quot;feedbackForm&quot;
+    )
+    .classList
+    .add(&quot;show&quot;);
+
 }
 
 
@@ -10169,28 +10187,16 @@ function showToast(message){
    const l=(text||&quot;&quot;).toLowerCase();return Object.keys(m).filter(k=&gt;l.includes(k)).map(k=&gt;({term:k,meaning:m[k]}));
  };
  window.explainDifficultTerms=function(){
-   const product=window.foodLensCurrentProduct||{};
-   const ingredients=product.ingredients||&quot;&quot;;
-   const area=document.getElementById(&quot;termResults&quot;);
-   if(!area)return;
-   const found=window.simplifyTechnicalTerms(ingredients);
-   if(found.length){
-     area.innerHTML=found.map(x=&gt;'&lt;div style=&quot;padding:10px 0;border-bottom:1px solid #ddd&quot;&gt;&lt;b&gt;'+x.term+'&lt;/b&gt;&lt;br&gt;'+x.meaning+'&lt;/div&gt;').join(&quot;&quot;);
-   }else{
-     area.innerHTML='&lt;div class=&quot;noTerms&quot;&gt;No difficult technical terms were found in this product ingredients list.&lt;/div&gt;';
-   }
+   const area=document.getElementById(&quot;termResults&quot;);if(!area)return;
+   const f=simplifyTechnicalTerms(area.innerText+&quot; &quot;+(document.getElementById(&quot;productName&quot;)?.innerText||&quot;&quot;));
+   area.innerHTML=f.length?f.map(x=&gt;'&lt;div style=&quot;padding:10px 0;border-bottom:1px solid #ddd&quot;&gt;&lt;b&gt;'+x.term+'&lt;/b&gt;&lt;br&gt;'+x.meaning+'&lt;/div&gt;').join(&quot;&quot;):&quot;&lt;b&gt;No difficult technical terms detected in this demo result.&lt;/b&gt;&quot;;
  };
  document.addEventListener(&quot;click&quot;,e=&gt;{const el=e.target.closest(&quot;[id]&quot;);if(!el)return;const id=el.id.toLowerCase();if(id===&quot;navhome&quot;)nav(&quot;home&quot;);if(id===&quot;navhistory&quot;)nav(&quot;history&quot;);if(id===&quot;navscan&quot;)nav(&quot;home&quot;);if(id===&quot;navlearn&quot;)nav(&quot;learn&quot;);if(id===&quot;navme&quot;)nav(&quot;profile&quot;)},true);
- document.addEventListener(&quot;DOMContentLoaded&quot;,function(){
-   const yes=document.querySelector('.feedbackBtn[onclick*=&quot;positiveFeedback&quot;]');
-   const no=document.querySelector('.feedbackBtn[onclick*=&quot;showFeedback&quot;]');
-   if(yes){yes.type=&quot;button&quot;;yes.addEventListener(&quot;click&quot;,function(e){e.preventDefault();positiveFeedback();});}
-   if(no){no.type=&quot;button&quot;;no.addEventListener(&quot;click&quot;,function(e){e.preventDefault();showFeedback();});}
-   const ex=document.getElementById(&quot;explainTermsButton&quot;);
-   if(ex){ex.addEventListener(&quot;click&quot;,function(e){e.preventDefault();explainDifficultTerms();});}
- });
- window.addEventListener(&quot;load&quot;,function(){
-   /* The result section already contains the single Explain button. */
+ window.addEventListener(&quot;load&quot;,()=&gt;{
+   const area=document.getElementById(&quot;termResults&quot;);
+   if(area&amp;&amp;!document.getElementById(&quot;simplifyTermsButton&quot;)){
+     const b=document.createElement(&quot;button&quot;);b.id=&quot;simplifyTermsButton&quot;;b.textContent=&quot;Explain difficult terms in simple language&quot;;b.style.cssText=&quot;width:100%;margin:12px 0;padding:14px;border:0;border-radius:14px;background:#39AFA5;font-weight:900&quot;;b.onclick=explainDifficultTerms;area.parentNode.insertBefore(b,area);
+   }
  });
 })();
 
@@ -13672,96 +13678,41 @@ if(frame)frame.addEventListener("load",function(){
   }
 
   async function lookupProduct(code){
-    code = digits(code);
-    if(!isRetailBarcode(code)) return null;
-
-    function num(v){
-      if(v === null || v === undefined || v === "") return null;
-      var x = Number(v);
-      return Number.isFinite(x) ? x : null;
-    }
-
-    function normalizeBackend(data){
-      data = data || {};
-      var p = (data.product && typeof data.product === "object") ? data.product : data;
-      var n = p.nutrition || p.nutriments || {};
-      var f = p.foodlens || {};
-      var h = p.health_assessment || {};
-
-      var sugar = num(n.sugar_g_100g ?? n.sugars_100g ?? n.sugars ?? n.sugar_g);
-      var sodium = num(n.sodium_mg_100g ?? n.sodium_mg);
-      var fibre = num(n.dietary_fiber_g_100g ?? n.fiber_g_100g ?? n.fibre_g_100g ?? n.fiber_g ?? n.fibre_g);
-      var protein = num(n.protein_g_100g ?? n.proteins_100g ?? n.protein_g);
-
-      return {
-        barcode: p.barcode || p.code || code,
-        name: p.name || p.product_name || p.product_name_en || "Product information unavailable",
-        brand: p.brand || p.brands || "Food product",
-        image: p.image || p.image_front_url || p.image_front_small_url || p.image_url || "",
-        score: f.score ?? h.score ?? p.score ?? p.nutriscore ?? p.nutriscore_grade ?? "—",
-        scoreCategory: f.category || h.category || p.scoreCategory || "",
-        recommendation: f.recommendation || p.recommendation || "",
-        nutrition: {
-          sugar: sugar === null ? "—" : sugar.toFixed(1) + "g",
-          sodium: sodium === null ? "—" : Math.round(sodium) + "mg",
-          fibre: fibre === null ? "—" : fibre.toFixed(1) + "g",
-          protein: protein === null ? "—" : protein.toFixed(1) + "g"
-        },
-        ingredients: p.ingredients || p.ingredients_text || p.ingredients_text_en || "",
-        backend: p
-      };
-    }
-
-    /* FIRST: the same Flask endpoint used by the working friend's app. */
+    /*
+      This is the single lookup hook.
+      The backend/API developer can replace this fetch later without touching
+      the scanner. Open Food Facts is the current fallback data source.
+    */
     try{
       var response = await fetch(
-        "/get_food_data?query=" + encodeURIComponent(code),
-        {
-          method:"GET",
-          headers:{"Accept":"application/json"},
-          cache:"no-store"
-        }
-      );
-
-      var data = null;
-      try{ data = await response.json(); }catch(e){}
-
-      if(response.ok && data){
-        var product = normalizeBackend(data);
-        if(product && product.name && product.name !== "Product information unavailable"){
-          return product;
-        }
-      }
-    }catch(error){
-      console.warn("FoodLens Flask lookup failed; trying Open Food Facts fallback:",error);
-    }
-
-    /* FALLBACK: keep the existing working product lookup if Flask has no record. */
-    try{
-      var off = await fetch(
         "https://world.openfoodfacts.org/api/v2/product/" +
         encodeURIComponent(code) +
-        ".json?fields=code,product_name,product_name_en,brands,image_front_small_url,image_front_url,nutrition_grades,nutriscore_grade,nutriscore_score,nutriments,ingredients_text,ingredients_text_en"
+        ".json?fields=code,product_name,product_name_en,brands,image_front_small_url,nutrition_grades,nutriscore_grade,nutriscore_score,nutriments,ingredients_text,ingredients_text_en"
       );
 
-      if(off.ok){
-        var offData = await off.json();
-        if(offData && offData.status === 1 && offData.product){
-          return normalizeProduct(offData.product,code);
+      if(response.ok){
+        var data = await response.json();
+        if(data && data.status === 1 && data.product){
+          return normalizeProduct(data.product, code);
         }
       }
     }catch(error){
-      console.warn("FoodLens Open Food Facts fallback failed:",error);
+      console.warn("Barcode product lookup failed:", error);
     }
 
     return {
-      barcode:code,
-      name:"Product information unavailable",
-      brand:"Barcode: " + code,
-      image:"",
-      score:"—",
-      nutrition:{sugar:"—",sodium:"—",fibre:"—",protein:"—"},
-      ingredients:""
+      barcode: code,
+      name: "Product information pending",
+      brand: "Barcode: " + code,
+      image: "🍽️",
+      score: "—",
+      nutrition: {
+        sugar: "—",
+        sodium: "—",
+        fibre: "—",
+        protein: "—"
+      },
+      ingredients: ""
     };
   }
 
@@ -13769,66 +13720,67 @@ if(frame)frame.addEventListener("load",function(){
     code = digits(code);
     if(!isRetailBarcode(code)) return;
 
-    try{ localStorage.setItem("foodlensLastBarcode",code); }catch(e){}
+    try{ localStorage.setItem("foodlensLastBarcode", code); }catch(e){}
 
-    /* EXACT FRIEND FLOW: open result, fetch product, then call existing displayProduct(). */
-    try{ window.foodLensShow?.("result"); }catch(e){}
-
-    var loading = {
-      barcode:code,
-      name:"Loading product information…",
-      brand:"Barcode: " + code,
-      image:"🍽️",
-      score:"—",
-      nutrition:{sugar:"—",sodium:"—",fibre:"—",protein:"—"},
-      ingredients:""
-    };
-
-    function render(product){
-      try{
-        var rw = getResult();
-        if(!rw || !rw.document || typeof rw.displayProduct !== "function") return false;
-        rw.displayProduct(product);
-        var scanned = rw.document.getElementById("scannedBarcode");
-        if(scanned) scanned.textContent = "Barcode: " + code;
-        return true;
-      }catch(error){
-        console.error("FoodLens result render failed:",error);
-        return false;
-      }
-    }
-
-    /* Wait for the result iframe instead of assuming it is ready after 80ms. */
-    for(var i=0;i<30;i++){
-      if(render(loading)) break;
-      await new Promise(function(resolve){setTimeout(resolve,100);});
-    }
-
-    var product = await lookupProduct(code);
-
-    /* Save exactly the product that was displayed. */
-    try{ saveHistory(product); }catch(e){}
-
-    /* Keep trying until the existing result screen accepts the product. */
-    for(var j=0;j<30;j++){
-      if(render(product)) break;
-      await new Promise(function(resolve){setTimeout(resolve,100);});
-    }
-
+    /*
+      Move to the result page immediately, then populate it when lookup
+      completes. This makes the captured barcode visibly useful even when
+      the product API is slow.
+    */
     try{
-      var rw2=getResult();
-      if(rw2 && rw2.document){
-        var explain=rw2.document.getElementById("scoreExplain");
-        if(explain && product.name === "Product information unavailable"){
-          explain.textContent="Barcode " + code + " was captured, but product information is unavailable.";
-        }
-        var category=rw2.document.getElementById("scoreLabel");
-        if(category && product.scoreCategory) category.textContent=product.scoreCategory;
+      if(typeof window.foodLensShow === "function"){
+        window.foodLensShow("result");
       }
     }catch(e){}
+
+    var resultWindow = getResult();
+    var initialProduct = {
+      barcode: code,
+      name: "Loading product information…",
+      brand: "Barcode: " + code,
+      image: "🍽️",
+      score: "—",
+      nutrition: {
+        sugar: "—",
+        sodium: "—",
+        fibre: "—",
+        protein: "—"
+      },
+      ingredients: ""
+    };
+
+    setTimeout(function(){
+      try{
+        resultWindow?.displayProduct?.(initialProduct);
+        var scanned = resultWindow?.document?.getElementById("scannedBarcode");
+        if(scanned) scanned.textContent = "Barcode: " + code;
+      }catch(e){}
+    }, 80);
+
+    var product = await lookupProduct(code);
+    saveHistory(product);
+
+    setTimeout(function(){
+      try{
+        if(resultWindow && typeof resultWindow.displayProduct === "function"){
+          resultWindow.displayProduct(product);
+
+          var scanned = resultWindow.document.getElementById("scannedBarcode");
+          if(scanned) scanned.textContent = "Barcode: " + code;
+
+          var explain = resultWindow.document.getElementById("scoreExplain");
+          if(explain && product.name === "Product information pending"){
+            explain.textContent =
+              "Barcode " + code +
+              " was captured successfully. Product information is not available from the current database yet.";
+          }
+        }
+      }catch(e){
+        console.error("Product result display failed:", e);
+      }
+    }, 120);
   }
 
-  
   /*
    * ONE destination for camera, manual entry, and any future backend/API
    * method. If another part of the app already calls home.processBarcode(),
@@ -14475,22 +14427,6 @@ if(frame)frame.addEventListener("load",function(){
 })();
 </script>
 
-
-<!-- =========================================================
-     FOODLENS — FINAL BACKEND PRODUCT PIPELINE
-     KEEP ALL EXISTING UI / ANIMATIONS / SCANNER DESIGN.
-     Only replace the barcode -> backend -> result connection.
-
-     Based on the working friend's flow:
-       barcode
-          -> /get_food_data?query=BARCODE
-          -> normalize response
-          -> existing result-frame displayProduct()
-
-     This backend returns the product directly:
-       name, brand, image, foodlens, health_assessment,
-       nutrition, consumption_guidance, ingredients, etc.
-     ========================================================= -->
 <script id="foodlensFinalBackendProductPipeline">
 (function(){
   "use strict";
