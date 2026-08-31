@@ -15100,3 +15100,459 @@ if(frame)frame.addEventListener("load",function(){
 
 })();
 </script>
+
+<script id="foodlensFinalBarcodeRouteFix">
+(function(){
+  "use strict";
+
+  /*
+   * FINAL ROUTING FIX
+   *
+   * Some of the existing scanner code can call the TOP-level
+   * displayProductForBarcode()/foodLensHandleBarcode() directly,
+   * while other scanner paths call HOME.processBarcode().
+   *
+   * The previous patch only reliably covered one of those paths.
+   *
+   * This patch makes ALL barcode entry points use the SAME backend
+   * lookup, while leaving the result-page design untouched.
+   */
+
+  var running = false;
+
+  function home(){
+    return document.getElementById("frame-home")?.contentWindow || null;
+  }
+
+  function result(){
+    return document.getElementById("frame-result")?.contentWindow || null;
+  }
+
+  function digits(v){
+    return String(v || "").replace(/\D/g,"");
+  }
+
+  function valid(c){
+    return [8,12,13,14].includes(c.length);
+  }
+
+  function goResult(){
+    try{
+      window.foodLensShow?.("result");
+    }catch(e){}
+  }
+
+  function normalize(data, code){
+
+    data = data || {};
+
+    var n = data.nutrition || {};
+    var f = data.foodlens || {};
+
+    function g(v){
+      if(v === null || v === undefined || v === "") return "—";
+      var x = Number(v);
+      return Number.isFinite(x) ? x.toFixed(1) + "g" : String(v);
+    }
+
+    function m(v){
+      if(v === null || v === undefined || v === "") return "—";
+      var x = Number(v);
+      return Number.isFinite(x) ? Math.round(x) + "mg" : String(v);
+    }
+
+    return {
+      barcode: data.barcode || code,
+
+      /* This is the product name returned by YOUR Flask backend. */
+      name: data.name || "Product information unavailable",
+
+      brand: data.brand || "Food product",
+
+      image: data.image || "",
+
+      /* This is YOUR FoodLens score, not browser Nutri-Score. */
+      score:
+        f.score ??
+        data.health_assessment?.score ??
+        "—",
+
+      scoreCategory:
+        f.category ||
+        data.health_assessment?.category ||
+        "",
+
+      recommendation:
+        f.recommendation ||
+        "",
+
+      nutrition:{
+        sugar: g(n.sugar_g_100g),
+        sodium: m(n.sodium_mg_100g),
+        fibre: g(n.dietary_fiber_g_100g),
+        protein: g(n.protein_g_100g)
+      },
+
+      ingredients:
+        data.ingredients || ""
+    };
+  }
+
+  function render(product){
+
+    var rw = result();
+
+    if(!rw || !rw.document) return;
+
+    if(typeof rw.displayProduct !== "function") return;
+
+    /*
+     * The EXISTING displayProduct() receives the object,
+     * so your existing UI remains responsible for rendering
+     * name, score, nutrition, ingredients, etc.
+     */
+    try{
+      rw.displayProduct(product);
+    }catch(e){
+      console.error("FoodLens result render:", e);
+    }
+
+    /*
+     * The existing result page was writing image URLs as text.
+     * Only correct that one visual element.
+     */
+    var box =
+      rw.document.getElementById("productImage");
+
+    if(box){
+
+      var src =
+        String(product.image || "").trim();
+
+      box.innerHTML = "";
+
+      if(/^https?:\/\//i.test(src)){
+
+        var img =
+          rw.document.createElement("img");
+
+        img.src = src;
+        img.alt = product.name || "Product image";
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = "contain";
+        img.style.display = "block";
+        img.style.borderRadius = "16px";
+
+        img.onerror = function(){
+          box.textContent = "🍽️";
+        };
+
+        box.appendChild(img);
+
+      }else{
+        box.textContent = src || "🍽️";
+      }
+    }
+
+    var scanned =
+      rw.document.getElementById("scannedBarcode");
+
+    if(scanned){
+      scanned.textContent =
+        "Barcode: " + product.barcode;
+    }
+
+    /*
+     * Use backend recommendation/category only if the existing
+     * design already has those elements.
+     */
+    var label =
+      rw.document.getElementById("scoreLabel");
+
+    if(label && product.scoreCategory){
+      label.textContent =
+        product.scoreCategory;
+    }
+
+    var explain =
+      rw.document.getElementById("scoreExplain");
+
+    if(explain && product.recommendation){
+      explain.textContent =
+        product.recommendation;
+    }
+  }
+
+  async function backendBarcode(value){
+
+    var code = digits(value);
+
+    if(!valid(code)) return;
+
+    if(running) return;
+    running = true;
+
+    try{
+      localStorage.setItem(
+        "foodlensLastBarcode",
+        code
+      );
+    }catch(e){}
+
+    /*
+     * Close whichever scanner implementation is active.
+     */
+    try{
+      var h = home();
+
+      h?.closeRealCamera?.();
+      h?.stopScanner?.();
+      h?.hideScanner?.();
+    }catch(e){}
+
+    goResult();
+
+    /*
+     * Keep the SAME result card, but show loading temporarily.
+     */
+    render({
+      barcode:code,
+      name:"Loading product information…",
+      brand:"Barcode: " + code,
+      image:"",
+      score:"—",
+      nutrition:{
+        sugar:"—",
+        sodium:"—",
+        fibre:"—",
+        protein:"—"
+      },
+      ingredients:""
+    });
+
+    try{
+
+      /*
+       * IMPORTANT:
+       * Product information now comes from YOUR Flask backend.
+       */
+      var r =
+        await fetch(
+          "/get_food_data?query=" +
+          encodeURIComponent(code),
+          {
+            method:"GET",
+            headers:{
+              "Accept":"application/json"
+            },
+            cache:"no-store"
+          }
+        );
+
+      var data = null;
+
+      try{
+        data = await r.json();
+      }catch(e){}
+
+      if(!r.ok){
+        throw new Error(
+          data?.error ||
+          "Product information could not be loaded."
+        );
+      }
+
+      var product =
+        normalize(data,code);
+
+      /*
+       * THIS is the part that brings the NAME back.
+       * data.name comes directly from the Flask response.
+       */
+      console.log(
+        "[FoodLens] Backend product:",
+        product.name,
+        product
+      );
+
+      render(product);
+
+      /*
+       * Keep history compatible with the existing app.
+       */
+      try{
+
+        var h =
+          JSON.parse(
+            localStorage.getItem(
+              "foodlensHistory"
+            ) || "[]"
+          );
+
+        if(!Array.isArray(h)) h=[];
+
+        h =
+          h.filter(
+            function(x){
+              return !(x && x.barcode === code);
+            }
+          );
+
+        h.unshift({
+          name:product.name,
+          score:product.score,
+          barcode:code,
+          nutrition:product.nutrition,
+          date:new Date().toLocaleDateString()
+        });
+
+        localStorage.setItem(
+          "foodlensHistory",
+          JSON.stringify(h.slice(0,20))
+        );
+
+      }catch(e){}
+
+    }catch(error){
+
+      console.error(
+        "[FoodLens] Backend lookup failed:",
+        error
+      );
+
+      var rw = result();
+
+      if(rw){
+
+        var name =
+          rw.document.getElementById("productName");
+
+        if(name){
+          name.textContent =
+            "Product information unavailable";
+        }
+
+        var brand =
+          rw.document.getElementById("productBrand");
+
+        if(brand){
+          brand.textContent =
+            "Barcode: " + code;
+        }
+
+        var explain =
+          rw.document.getElementById("scoreExplain");
+
+        if(explain){
+          explain.textContent =
+            error.message ||
+            "Unable to retrieve product information.";
+        }
+      }
+
+    }finally{
+
+      running = false;
+    }
+  }
+
+  function install(){
+
+    var h = home();
+
+    /*
+     * Camera, voice scanner and manual entry inside the HOME frame.
+     */
+    if(h){
+
+      h.processBarcode =
+        backendBarcode;
+
+      h.foodLensHandleBarcode =
+        backendBarcode;
+
+      /*
+       * Preserve the existing camera UI.
+       */
+      h.manualBarcode =
+        function(){
+
+          var raw =
+            window.prompt(
+              "Enter the product barcode:"
+            );
+
+          if(raw === null) return;
+
+          var c = digits(raw);
+
+          if(!valid(c)){
+            window.alert(
+              "Please enter a complete 8, 12, 13 or 14 digit barcode."
+            );
+            return;
+          }
+
+          backendBarcode(c);
+        };
+    }
+
+    /*
+     * TOP-level scanner entry points.
+     * These were the missing routes causing the old result path
+     * to be used in some cases.
+     */
+    window.foodLensHandleBarcode =
+      backendBarcode;
+
+    window.displayProductForBarcode =
+      backendBarcode;
+  }
+
+  /*
+   * Install repeatedly because your app uses iframes and some of
+   * the existing scripts initialise their functions after page load.
+   */
+  install();
+
+  var count = 0;
+
+  var timer =
+    setInterval(
+      function(){
+
+        install();
+
+        count++;
+
+        if(count >= 40){
+          clearInterval(timer);
+        }
+
+      },
+      250
+    );
+
+  ["frame-home","frame-result"].forEach(
+    function(id){
+
+      var f =
+        document.getElementById(id);
+
+      f?.addEventListener(
+        "load",
+        function(){
+
+          install();
+
+          setTimeout(install,100);
+          setTimeout(install,500);
+          setTimeout(install,1000);
+        }
+      );
+    }
+  );
+
+})();
+</script>
