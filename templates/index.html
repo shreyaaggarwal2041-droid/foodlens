@@ -12183,29 +12183,31 @@ window.__FOODLENS_NUMBER_SCANNER=start;
         try{box.remove()}catch(e){}
       }
 
-      function finish(raw){
-        if(stopped) return;
-        var code=String(raw||"").replace(/\D/g,"");
-        if(code.length<8) return;
+       }
+function finish(raw) {
+    var code = String(raw || "").replace(/\D/g, "");
 
-        status.textContent=(hi?"✓ बारकोड मिला: ":"✓ Barcode detected: ")+code;
+    if (code.length < 8) return;
 
-        try{localStorage.setItem("foodlensLastBarcode",code)}catch(e){}
-        try{stop()}catch(e){}
+    status.textContent = "Barcode detected: " + code;
 
-        /*
-         * Use the iframe's existing processBarcode, which posts the number
-         * to the parent and triggers the real Open Food Facts lookup/history.
-         */
-        try{
-          if(typeof w.processBarcode==="function"){
+    try {
+        localStorage.setItem("foodlensLastBarcode", code);
+    } catch (e) {}
+
+    try {
+        if (typeof w.processBarcode === "function") {
             w.processBarcode(code);
-          }else if(w.parent!==w){
-            w.parent.postMessage({type:"foodlens-barcode",barcode:code},"*");
-          }
-        }catch(e){console.error("Final barcode routing failed",e)}
-      }
-
+        } else if (w.parent !== w) {
+            w.parent.postMessage({
+                type: "foodlens-barcode",
+                barcode: code
+            }, "*");
+        }
+    } catch (e) {
+        console.error("Final barcode routing failed:", e);
+    }
+}
       box.querySelector("#flFinalClose").onclick=stop;
 
       box.querySelector("#flFinalManual").onclick=function(){
@@ -14560,6 +14562,612 @@ window.displayProductForBarcode = displayProductForBarcode;
       setTimeout(bindHome,1500);
     });
   }
+
+})();
+</script>
+
+<script id="foodlensFriendStyleBarcodeFinal">
+(function(){
+  "use strict";
+
+  /*
+   * FINAL BARCODE FIX
+   * -----------------
+   * Keep the user's existing FoodLens app, screens, animations,
+   * result page and product pipeline.
+   *
+   * Only replace the barcode/camera entry point with the same
+   * working pattern used by the friend's app:
+   *
+   * camera -> ZXing continuous 1-D barcode decoding
+   *        -> existing home.processBarcode(code)
+   *
+   * No second scanner and no "Waiting for scan" result screen.
+   */
+
+  function home(){
+    return document.getElementById("frame-home")?.contentWindow || null;
+  }
+
+  function digits(value){
+    return String(value || "").replace(/\D/g,"");
+  }
+
+  function valid(code){
+    return [8,12,13,14].includes(String(code).length);
+  }
+
+  function loadZXing(w){
+    if(w.ZXingBrowser?.BrowserMultiFormatOneDReader ||
+       w.ZXingBrowser?.BrowserMultiFormatReader){
+      return Promise.resolve(true);
+    }
+
+    return new Promise(function(resolve){
+      var existing =
+        w.document.querySelector(
+          'script[data-foodlens-final-zxing-friend="1"]'
+        );
+
+      if(existing){
+        if(w.ZXingBrowser){
+          resolve(true);
+          return;
+        }
+
+        existing.addEventListener(
+          "load",
+          function(){resolve(!!w.ZXingBrowser)},
+          {once:true}
+        );
+
+        existing.addEventListener(
+          "error",
+          function(){resolve(false)},
+          {once:true}
+        );
+
+        setTimeout(
+          function(){resolve(!!w.ZXingBrowser)},
+          10000
+        );
+
+        return;
+      }
+
+      var script =
+        w.document.createElement("script");
+
+      script.dataset.foodlensFinalZxingFriend = "1";
+
+      script.src =
+        "https://cdn.jsdelivr.net/npm/@zxing/browser@0.2.0";
+
+      script.onload =
+        function(){resolve(!!w.ZXingBrowser)};
+
+      script.onerror =
+        function(){resolve(false)};
+
+      w.document.head.appendChild(script);
+    });
+  }
+
+  function install(){
+
+    var w = home();
+
+    if(!w || !w.document) return false;
+
+    /*
+     * This is the scanner overlay only.
+     * The rest of the user's app is untouched.
+     */
+    w.foodLensOpenRealCamera = async function(){
+
+      var old =
+        w.document.getElementById(
+          "foodlensFriendCamera"
+        );
+
+      if(old) old.remove();
+
+      var hi =
+        (w.localStorage.getItem("foodlensLanguage") || "en")
+          === "hi";
+
+      var box =
+        w.document.createElement("div");
+
+      box.id =
+        "foodlensFriendCamera";
+
+      box.style.cssText =
+        "position:fixed;inset:0;z-index:2147483647;" +
+        "background:#111;color:#fff;display:flex;" +
+        "flex-direction:column;padding:14px;" +
+        "box-sizing:border-box;";
+
+      box.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+          '<b style="font-size:20px">'+
+            (hi ? "बारकोड स्कैन करें" : "Scan product barcode")+
+          '</b>'+
+          '<button id="foodlensFriendClose" style="border:0;border-radius:12px;padding:10px 14px;font-weight:900">'+
+            "✕ "+(hi ? "बंद करें" : "Close")+
+          '</button>'+
+        '</div>'+
+        '<div style="position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:20px">'+
+          '<video id="foodlensFriendVideo" autoplay playsinline muted style="width:100%;height:100%;object-fit:cover;background:#222;border-radius:20px"></video>'+
+          '<div style="position:absolute;width:86%;height:28%;border:3px solid #F9D94C;border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.25);pointer-events:none"></div>'+
+        '</div>'+
+        '<div id="foodlensFriendDetected" style="display:none;text-align:center;font-size:22px;font-weight:1000;padding:8px"></div>'+
+        '<div id="foodlensFriendStatus" style="text-align:center;min-height:42px;padding:8px;font-weight:800;font-size:14px">'+
+          (hi ? "कैमरा शुरू हो रहा है…" : "Starting camera…")+
+        '</div>';
+
+      w.document.body.appendChild(box);
+
+      var video =
+        box.querySelector(
+          "#foodlensFriendVideo"
+        );
+
+      var status =
+        box.querySelector(
+          "#foodlensFriendStatus"
+        );
+
+      var detected =
+        box.querySelector(
+          "#foodlensFriendDetected"
+        );
+
+      var stream = null;
+      var reader = null;
+      var controls = null;
+      var detector = null;
+      var nativeTimer = null;
+      var stopped = false;
+      var accepted = false;
+
+      function stop(){
+
+        try{controls?.stop?.()}catch(e){}
+        try{reader?.reset?.()}catch(e){}
+
+        if(nativeTimer){
+          clearInterval(nativeTimer);
+          nativeTimer = null;
+        }
+
+        try{
+          stream?.getTracks?.().forEach(
+            function(track){track.stop()}
+          );
+        }catch(e){}
+
+        try{video.pause()}catch(e){}
+
+        video.srcObject = null;
+
+        stream = null;
+        reader = null;
+        controls = null;
+      }
+
+      function close(){
+
+        if(stopped) return;
+
+        stopped = true;
+
+        stop();
+
+        try{box.remove()}catch(e){}
+      }
+
+      async function finish(raw){
+
+        if(stopped || accepted) return;
+
+        var code = digits(raw);
+
+        if(!valid(code)) return;
+
+        accepted = true;
+
+        detected.style.display = "block";
+
+        detected.textContent =
+          (hi ? "✓ बारकोड: " : "✓ Barcode: ") +
+          code;
+
+        status.textContent =
+          hi
+            ? "बारकोड पहचाना गया — उत्पाद खोला जा रहा है…"
+            : "Barcode detected — opening product…";
+
+        try{
+          w.localStorage.setItem(
+            "foodlensLastBarcode",
+            code
+          );
+        }catch(e){}
+
+        /*
+         * CRITICAL:
+         * Do NOT create another product renderer.
+         * Use the user's existing processBarcode().
+         * In the user's app this is already connected to the
+         * product-result system.
+         */
+        setTimeout(async function(){
+
+          close();
+
+          try{
+
+            if(typeof w.processBarcode === "function"){
+
+              await w.processBarcode(code);
+              return;
+            }
+
+            if(typeof w.displayProductForBarcode === "function"){
+
+              await w.displayProductForBarcode(code);
+              return;
+            }
+
+            /*
+             * Last-resort parent handoff.
+             */
+            w.parent?.postMessage(
+              {
+                type:"foodlens-barcode",
+                barcode:code
+              },
+              "*"
+            );
+
+          }catch(error){
+
+            console.error(
+              "FoodLens product lookup failed:",
+              error
+            );
+          }
+
+        },650);
+      }
+
+      box.querySelector(
+        "#foodlensFriendClose"
+      ).onclick = close;
+
+      if(!w.isSecureContext ||
+         !w.navigator.mediaDevices?.getUserMedia){
+
+        status.textContent =
+          hi
+            ? "कैमरे के लिए HTTPS या localhost जरूरी है।"
+            : "Camera requires HTTPS or localhost.";
+
+        return;
+      }
+
+      try{
+
+        /*
+         * SAME CAMERA PATTERN AS THE WORKING VERSION:
+         * high-resolution environment-facing camera.
+         */
+        stream =
+          await w.navigator.mediaDevices.getUserMedia({
+            video:{
+              facingMode:{ideal:"environment"},
+              width:{ideal:1920,min:1280},
+              height:{ideal:1080,min:720},
+              frameRate:{ideal:30,max:30}
+            },
+            audio:false
+          });
+
+        video.srcObject = stream;
+        video.muted = true;
+        video.setAttribute("playsinline","");
+        await video.play();
+
+        /*
+         * Continuous autofocus when supported.
+         */
+        try{
+
+          var track =
+            stream.getVideoTracks()[0];
+
+          var caps =
+            track.getCapabilities?.() || {};
+
+          var advanced = [];
+
+          if(
+            caps.focusMode?.includes?.(
+              "continuous"
+            )
+          ){
+            advanced.push({
+              focusMode:"continuous"
+            });
+          }
+
+          if(
+            caps.exposureMode?.includes?.(
+              "continuous"
+            )
+          ){
+            advanced.push({
+              exposureMode:"continuous"
+            });
+          }
+
+          if(advanced.length){
+            await track.applyConstraints({
+              advanced:advanced
+            });
+          }
+
+        }catch(e){}
+
+        status.textContent =
+          hi
+            ? "ऑटोमैटिक स्कैन हो रहा है… बारकोड को साफ रखें।"
+            : "Automatic scanning… keep the barcode sharp and fully visible.";
+
+        /*
+         * PRIMARY: ZXing continuous 1-D barcode reader.
+         * This is the important part copied in principle from
+         * the working scanner architecture.
+         */
+        var loaded =
+          await loadZXing(w);
+
+        if(loaded &&
+           w.ZXingBrowser?.BrowserMultiFormatOneDReader){
+
+          try{
+
+            reader =
+              new w.ZXingBrowser
+                .BrowserMultiFormatOneDReader();
+
+            controls =
+              await reader.decodeFromVideoElement(
+                video,
+                function(result){
+
+                  if(
+                    result &&
+                    !accepted &&
+                    !stopped
+                  ){
+                    finish(result.getText());
+                  }
+                }
+              );
+
+          }catch(error){
+
+            console.warn(
+              "ZXing 1-D decoder error:",
+              error
+            );
+          }
+
+        }else if(
+          loaded &&
+          w.ZXingBrowser?.BrowserMultiFormatReader
+        ){
+
+          /*
+           * Compatibility fallback for the browser build
+           * where only BrowserMultiFormatReader is exposed.
+           */
+          try{
+
+            reader =
+              new w.ZXingBrowser
+                .BrowserMultiFormatReader();
+
+            controls =
+              await reader.decodeFromVideoElement(
+                video,
+                function(result){
+
+                  if(
+                    result &&
+                    !accepted &&
+                    !stopped
+                  ){
+                    finish(result.getText());
+                  }
+                }
+              );
+
+          }catch(error){
+
+            console.warn(
+              "ZXing multi-format decoder error:",
+              error
+            );
+          }
+        }
+
+        /*
+         * SECONDARY SAFETY NET:
+         * Native BarcodeDetector reads the SAME video stream.
+         * It does NOT open a second camera.
+         */
+        if(
+          "BarcodeDetector" in w
+        ){
+
+          try{
+
+            try{
+
+              detector =
+                new w.BarcodeDetector({
+                  formats:[
+                    "ean_13",
+                    "ean_8",
+                    "upc_a",
+                    "upc_e",
+                    "code_128",
+                    "code_39",
+                    "itf",
+                    "itf_14",
+                    "codabar"
+                  ]
+                });
+
+            }catch(e){
+
+              detector =
+                new w.BarcodeDetector();
+            }
+
+            nativeTimer =
+              setInterval(
+                async function(){
+
+                  if(
+                    stopped ||
+                    accepted ||
+                    video.readyState < 2 ||
+                    !video.videoWidth
+                  ){
+                    return;
+                  }
+
+                  try{
+
+                    var hits =
+                      await detector.detect(
+                        video
+                      );
+
+                    if(
+                      hits?.length &&
+                      !accepted
+                    ){
+                      finish(
+                        hits[0].rawValue
+                      );
+                    }
+
+                  }catch(e){}
+
+                },
+                350
+              );
+
+          }catch(e){}
+        }
+
+        status.textContent =
+          hi
+            ? "ऑटोमैटिक स्कैन हो रहा है — पूरा बारकोड पीले बॉक्स में रखें।"
+            : "Automatic scanning — keep the complete barcode inside the yellow box.";
+
+      }catch(error){
+
+        console.error(
+          "FoodLens camera error:",
+          error
+        );
+
+        status.textContent =
+          hi
+            ? "कैमरा शुरू नहीं हो सका। कैमरा अनुमति जांचें।"
+            : "Camera could not start. Check camera permission.";
+      }
+    };
+
+    /*
+     * Make ALL existing barcode entry points use the same scanner.
+     * This is what prevents the old broken scanner from appearing.
+     */
+    w.openCamera =
+      w.foodLensOpenRealCamera;
+
+    w.openBarcode =
+      w.foodLensOpenRealCamera;
+
+    w.startBarcodeScannerFromTutorial =
+      w.foodLensOpenRealCamera;
+
+    /*
+     * Existing inline buttons such as onclick="openBarcode()"
+     * now resolve to the working function above.
+     */
+    return true;
+  }
+
+  install();
+
+  var frame =
+    document.getElementById(
+      "frame-home"
+    );
+
+  if(frame){
+
+    frame.addEventListener(
+      "load",
+      function(){
+
+        install();
+
+        setTimeout(
+          install,
+          200
+        );
+
+        setTimeout(
+          install,
+          800
+        );
+
+        setTimeout(
+          install,
+          1500
+        );
+      }
+    );
+  }
+
+  /*
+   * Short retry window because the home iframe can be recreated.
+   */
+  var tries = 0;
+
+  var timer =
+    setInterval(
+      function(){
+
+        tries++;
+
+        install();
+
+        if(tries >= 20){
+          clearInterval(timer);
+        }
+
+      },
+      300
+    );
 
 })();
 </script>
