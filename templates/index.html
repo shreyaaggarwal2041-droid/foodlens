@@ -15497,137 +15497,60 @@ if(frame)frame.addEventListener("load",function(){
    * Camera, manual entry and any scanner callback use this.
    */
   async function displayProductForBarcode(code){
-
     code = digits(code);
-
     if(!validBarcode(code)) return;
 
+    try{ localStorage.setItem("foodlensLastBarcode",code); }catch(e){}
+
+    /* SAME WORKING FLOW: open result -> wait for result iframe -> lookup -> render. */
     try{
-      localStorage.setItem(
-        "foodlensLastBarcode",
-        code
-      );
+      if(typeof TOP.foodLensShow === "function") TOP.foodLensShow("result");
     }catch(e){}
 
-    /*
-     * Show the existing result screen.
-     */
-    try{
-      if(typeof TOP.foodLensShow === "function"){
-        TOP.foodLensShow("result");
-      }
-    }catch(e){}
+    var loading = {
+      barcode:code,
+      name: lang()==="hi" ? "उत्पाद की जानकारी लोड हो रही है…" : "Loading product information…",
+      brand: (lang()==="hi" ? "बारकोड: " : "Barcode: ") + code,
+      image:"",
+      score:"—",
+      nutrition:{sugar:"—",sodium:"—",fibre:"—",protein:"—"},
+      ingredients:""
+    };
 
-    /*
-     * Give the existing result frame a loading state.
-     */
-    var rw = getResult();
-
-    patchResultFrame();
-
-    setTimeout(function(){
-
+    function render(product){
       try{
-
-        var current = getResult();
-
-        current?.displayProduct?.({
-          barcode:code,
-          name:
-            lang()==="hi"
-              ? "उत्पाद की जानकारी लोड हो रही है…"
-              : "Loading product information…",
-          brand:
-            (lang()==="hi"
-              ? "बारकोड: "
-              : "Barcode: ") + code,
-          image:"",
-          score:"—",
-          nutrition:{
-            sugar:"—",
-            sodium:"—",
-            fibre:"—",
-            protein:"—"
-          },
-          ingredients:""
-        });
-
-      }catch(e){}
-
-    },80);
-
-    /*
-     * NOW use the backend — exactly the missing step.
-     */
-    var product =
-      await lookupProduct(code);
-
-    /*
-     * Make sure the result frame has loaded its renderer.
-     */
-    patchResultFrame();
-
-    /*
-     * Existing renderer is now given the REAL backend product.
-     */
-    setTimeout(function(){
-
-      try{
-
-        var current = getResult();
-
-        if(current &&
-           typeof current.displayProduct === "function"){
-
-          current.displayProduct(product);
-
-          var scanned =
-            current.document.getElementById(
-              "scannedBarcode"
-            );
-
-          if(scanned){
-            scanned.textContent =
-              (lang()==="hi"
-                ? "बारकोड: "
-                : "Barcode: ") + code;
-          }
-
-          /*
-           * If backend failed, make that explicit
-           * instead of leaving "Waiting for scan".
-           */
-          if(product.backendError){
-
-            var explain =
-              current.document.getElementById(
-                "scoreExplain"
-              );
-
-            if(explain){
-
-              explain.textContent =
-                product.backendError;
-            }
-          }
-
-        }
-
+        patchResultFrame();
+        var rw=getResult();
+        if(!rw || !rw.document || typeof rw.displayProduct !== "function") return false;
+        rw.displayProduct(product);
+        var scanned=rw.document.getElementById("scannedBarcode");
+        if(scanned) scanned.textContent=(lang()==="hi"?"बारकोड: ":"Barcode: ")+code;
+        return true;
       }catch(error){
-
-        console.error(
-          "[FoodLens] Final product render failed:",
-          error
-        );
+        console.error("[FoodLens] result render failed:",error);
+        return false;
       }
+    }
 
-    },120);
+    /* IMPORTANT: do not assume the iframe is ready after 80/120ms. */
+    for(var i=0;i<40;i++){
+      if(render(loading)) break;
+      await new Promise(function(resolve){setTimeout(resolve,100);});
+    }
 
-    /*
-     * Save history ONCE here.
-     * The existing renderer may also save history, so avoid
-     * writing a second record ourselves.
-     */
+    /* This is the same backend path that was already working. */
+    var product=await lookupProduct(code);
+
+    /* Keep trying until the EXISTING result renderer accepts the real product. */
+    var rendered=false;
+    for(var j=0;j<40;j++){
+      if(render(product)){ rendered=true; break; }
+      await new Promise(function(resolve){setTimeout(resolve,100);});
+    }
+
+    if(!rendered){
+      console.error("[FoodLens] Result iframe never became ready for barcode",code);
+    }
   }
 
   /*
