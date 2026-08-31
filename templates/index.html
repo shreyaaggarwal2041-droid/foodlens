@@ -8685,9 +8685,14 @@ Make a choice that works for you.
 &lt;h3&gt;
         MAKE THE LABEL SIMPLE
     &lt;/h3&gt;
-&lt;button class=&quot;smallBtn&quot; onclick=&quot;readSimplifiedTerms()&quot;&gt;
+&lt;button class=&quot;smallBtn&quot; id=&quot;readTermsButton&quot; onclick=&quot;readSimplifiedTerms()&quot;&gt;
 
         Read aloud
+
+    &lt;/button&gt;
+&lt;button class=&quot;smallBtn&quot; id=&quot;explainTermsButton&quot; type=&quot;button&quot; onclick=&quot;explainDifficultTerms()&quot;&gt;
+
+        Explain difficult terms
 
     &lt;/button&gt;
 &lt;/div&gt;
@@ -9461,6 +9466,7 @@ function findDifficultTerms(
 
 function displayProduct(product){
     product = product || {};
+    window.foodLensCurrentProduct = product;
     product.nutrition = product.nutrition || {
         sugar: product.sugar ?? "—",
         sodium: product.sodium ?? "—",
@@ -9691,7 +9697,7 @@ function renderTerms(
 function readSimplifiedTerms(){
 
     const product =
-    sampleProduct;
+    window.foodLensCurrentProduct || {};
 
 
     const matches =
@@ -9871,14 +9877,12 @@ function positiveFeedback(){
 
 
 function showFeedback(){
-
-    document
-    .getElementById(
-        &quot;feedbackForm&quot;
-    )
-    .classList
-    .add(&quot;show&quot;);
-
+    const form=document.getElementById(&quot;feedbackForm&quot;);
+    if(!form)return;
+    form.classList.add(&quot;show&quot;);
+    form.style.display=&quot;block&quot;;
+    const box=document.getElementById(&quot;feedbackText&quot;);
+    if(box)box.focus();
 }
 
 
@@ -10187,16 +10191,28 @@ function showToast(message){
    const l=(text||&quot;&quot;).toLowerCase();return Object.keys(m).filter(k=&gt;l.includes(k)).map(k=&gt;({term:k,meaning:m[k]}));
  };
  window.explainDifficultTerms=function(){
-   const area=document.getElementById(&quot;termResults&quot;);if(!area)return;
-   const f=simplifyTechnicalTerms(area.innerText+&quot; &quot;+(document.getElementById(&quot;productName&quot;)?.innerText||&quot;&quot;));
-   area.innerHTML=f.length?f.map(x=&gt;'&lt;div style=&quot;padding:10px 0;border-bottom:1px solid #ddd&quot;&gt;&lt;b&gt;'+x.term+'&lt;/b&gt;&lt;br&gt;'+x.meaning+'&lt;/div&gt;').join(&quot;&quot;):&quot;&lt;b&gt;No difficult technical terms detected in this demo result.&lt;/b&gt;&quot;;
+   const product=window.foodLensCurrentProduct||{};
+   const ingredients=product.ingredients||&quot;&quot;;
+   const area=document.getElementById(&quot;termResults&quot;);
+   if(!area)return;
+   const found=window.simplifyTechnicalTerms(ingredients);
+   if(found.length){
+     area.innerHTML=found.map(x=&gt;'&lt;div style=&quot;padding:10px 0;border-bottom:1px solid #ddd&quot;&gt;&lt;b&gt;'+x.term+'&lt;/b&gt;&lt;br&gt;'+x.meaning+'&lt;/div&gt;').join(&quot;&quot;);
+   }else{
+     area.innerHTML='&lt;div class=&quot;noTerms&quot;&gt;No difficult technical terms were found in this product ingredients list.&lt;/div&gt;';
+   }
  };
  document.addEventListener(&quot;click&quot;,e=&gt;{const el=e.target.closest(&quot;[id]&quot;);if(!el)return;const id=el.id.toLowerCase();if(id===&quot;navhome&quot;)nav(&quot;home&quot;);if(id===&quot;navhistory&quot;)nav(&quot;history&quot;);if(id===&quot;navscan&quot;)nav(&quot;home&quot;);if(id===&quot;navlearn&quot;)nav(&quot;learn&quot;);if(id===&quot;navme&quot;)nav(&quot;profile&quot;)},true);
- window.addEventListener(&quot;load&quot;,()=&gt;{
-   const area=document.getElementById(&quot;termResults&quot;);
-   if(area&amp;&amp;!document.getElementById(&quot;simplifyTermsButton&quot;)){
-     const b=document.createElement(&quot;button&quot;);b.id=&quot;simplifyTermsButton&quot;;b.textContent=&quot;Explain difficult terms in simple language&quot;;b.style.cssText=&quot;width:100%;margin:12px 0;padding:14px;border:0;border-radius:14px;background:#39AFA5;font-weight:900&quot;;b.onclick=explainDifficultTerms;area.parentNode.insertBefore(b,area);
-   }
+ document.addEventListener(&quot;DOMContentLoaded&quot;,function(){
+   const yes=document.querySelector('.feedbackBtn[onclick*=&quot;positiveFeedback&quot;]');
+   const no=document.querySelector('.feedbackBtn[onclick*=&quot;showFeedback&quot;]');
+   if(yes){yes.type=&quot;button&quot;;yes.addEventListener(&quot;click&quot;,function(e){e.preventDefault();positiveFeedback();});}
+   if(no){no.type=&quot;button&quot;;no.addEventListener(&quot;click&quot;,function(e){e.preventDefault();showFeedback();});}
+   const ex=document.getElementById(&quot;explainTermsButton&quot;);
+   if(ex){ex.addEventListener(&quot;click&quot;,function(e){e.preventDefault();explainDifficultTerms();});}
+ });
+ window.addEventListener(&quot;load&quot;,function(){
+   /* The result section already contains the single Explain button. */
  });
 })();
 
@@ -10316,133 +10332,6 @@ function showToast(message){
   const langb=document.getElementById("languageButton");if(langb)langb.onclick=window.changeLanguage;
   window.addEventListener("load",applyResultLanguage);
   setInterval(applyResultLanguage,1200);
-})();
-&lt;/script&gt;
-&lt;script&gt;
-(function(){
-  &quot;use strict&quot;;
-
-  function toast(message){
-    try{
-      if(typeof showToast === &quot;function&quot;) showToast(message);
-      else {
-        var t=document.getElementById(&quot;toast&quot;);
-        if(t){t.textContent=message;t.classList.add(&quot;show&quot;);setTimeout(function(){t.classList.remove(&quot;show&quot;)},2500);}
-      }
-    }catch(e){}
-  }
-
-  function currentProduct(){
-    try{
-      if(window.__foodLensCurrentProduct) return window.__foodLensCurrentProduct;
-      if(window.parent &amp;&amp; window.parent.__foodLensLastProduct) return window.parent.__foodLensLastProduct;
-    }catch(e){}
-    return null;
-  }
-
-  function termsForProduct(){
-    var p=currentProduct() || {};
-    var ingredients=String(p.ingredients || &quot;&quot;);
-    if(typeof findDifficultTerms === &quot;function&quot;) return findDifficultTerms(ingredients);
-    return [];
-  }
-
-  function showSimpleLabel(){
-    var area=document.getElementById(&quot;termResults&quot;);
-    if(!area) return;
-    var matches=termsForProduct();
-    area.innerHTML=&quot;&quot;;
-    if(!matches.length){
-      var empty=document.createElement(&quot;div&quot;);
-      empty.className=&quot;noTerms&quot;;
-      empty.textContent=&quot;No difficult ingredients were identified in this product.&quot;;
-      area.appendChild(empty);
-      return;
-    }
-    matches.forEach(function(term){
-      var card=document.createElement(&quot;div&quot;);
-      card.className=&quot;termCard&quot;;
-      card.style.cssText=&quot;padding:12px 0;border-bottom:1px solid #E5DDCC;line-height:1.5&quot;;
-      card.innerHTML=&quot;&lt;strong&gt;&quot;+term.code+&quot;&lt;/strong&gt;&lt;br&gt;&lt;span&gt;&quot;+term.simple+&quot;&lt;/span&gt;&lt;br&gt;&lt;small&gt;&quot;+term.meaning+&quot;&lt;/small&gt;&quot;;
-      area.appendChild(card);
-    });
-  }
-
-  function readSimpleLabel(){
-    var matches=termsForProduct();
-    if(!matches.length){toast(&quot;No difficult ingredients were identified in this product.&quot;);return;}
-    var text=&quot;FoodLens found the following difficult ingredients. &quot;;
-    matches.forEach(function(term){text+=term.code+&quot; means &quot;+term.simple+&quot;. &quot;+term.meaning+&quot; &quot;;});
-    if(typeof speak === &quot;function&quot;) speak(text); else if(window.speechSynthesis){speechSynthesis.cancel();speechSynthesis.speak(new SpeechSynthesisUtterance(text));}
-  }
-
-  function saveFeedback(kind,message){
-    try{
-      var a=JSON.parse(localStorage.getItem(&quot;foodlensFeedbackLoop&quot;)||&quot;[]&quot;);
-      a.unshift({type:kind,message:message||&quot;&quot;,product:document.getElementById(&quot;productName&quot;)?.innerText||&quot;Scanned product&quot;,barcode:localStorage.getItem(&quot;foodlensLastBarcode&quot;)||&quot;&quot;,date:new Date().toISOString()});
-      localStorage.setItem(&quot;foodlensFeedbackLoop&quot;,JSON.stringify(a.slice(0,50)));
-    }catch(e){}
-  }
-
-  function bindInteractions(){
-    var area=document.getElementById(&quot;termResults&quot;);
-    if(area &amp;&amp; !document.getElementById(&quot;simplifyTermsButton&quot;)){
-      var b=document.createElement(&quot;button&quot;);
-      b.id=&quot;simplifyTermsButton&quot;;
-      b.type=&quot;button&quot;;
-      b.textContent=&quot;Explain difficult terms in simple language&quot;;
-      b.style.cssText=&quot;width:100%;margin:12px 0;padding:14px;border:0;border-radius:14px;background:#4FAF9F;color:white;font-weight:900;cursor:pointer&quot;;
-      b.addEventListener(&quot;click&quot;,showSimpleLabel);
-      area.parentNode.insertBefore(b,area);
-    }
-
-    document.querySelectorAll(&quot;.simplifier .smallBtn&quot;).forEach(function(b){
-      if(b.dataset.foodlensBound) return;
-      b.dataset.foodlensBound=&quot;1&quot;;
-      b.addEventListener(&quot;click&quot;,function(e){e.preventDefault();e.stopPropagation();readSimpleLabel();});
-    });
-
-    document.querySelectorAll(&quot;.feedbackBtn&quot;).forEach(function(b,i){
-      if(b.dataset.foodlensBound) return;
-      b.dataset.foodlensBound=&quot;1&quot;;
-      b.addEventListener(&quot;click&quot;,function(e){
-        e.preventDefault();e.stopPropagation();
-        if(i===0){saveFeedback(&quot;positive&quot;);toast(&quot;Thank you! Your feedback helps improve FoodLens.&quot;);}
-        else {
-          var form=document.getElementById(&quot;feedbackForm&quot;);
-          if(form) form.classList.add(&quot;show&quot;);
-          saveFeedback(&quot;negative&quot;);
-        }
-      });
-    });
-
-    var submit=document.querySelector(&#x27;#feedbackForm .formBtn:last-child&#x27;);
-    if(submit &amp;&amp; !submit.dataset.foodlensBound){
-      submit.dataset.foodlensBound=&quot;1&quot;;
-      submit.addEventListener(&quot;click&quot;,function(e){
-        e.preventDefault();e.stopPropagation();
-        var box=document.getElementById(&quot;feedbackText&quot;),msg=(box?.value||&quot;&quot;).trim();
-        if(!msg){toast(&quot;Please tell us what could be improved.&quot;);return;}
-        saveFeedback(&quot;comment&quot;,msg);
-        if(box) box.value=&quot;&quot;;
-        document.getElementById(&quot;feedbackForm&quot;)?.classList.remove(&quot;show&quot;);
-        toast(&quot;Feedback submitted. Thank you!&quot;);
-      });
-    }
-
-    var voice=document.querySelector(&#x27;#feedbackForm .formBtn:first-child&#x27;);
-    if(voice &amp;&amp; !voice.dataset.foodlensBound){
-      voice.dataset.foodlensBound=&quot;1&quot;;
-      voice.addEventListener(&quot;click&quot;,function(e){
-        e.preventDefault();e.stopPropagation();
-        if(typeof voiceFeedback === &quot;function&quot;) voiceFeedback();
-      });
-    }
-  }
-
-  window.__foodLensBindInteractions=bindInteractions;
-  window.addEventListener(&quot;load&quot;,function(){setTimeout(bindInteractions,50);setTimeout(bindInteractions,500);});
-  setTimeout(bindInteractions,100);
 })();
 &lt;/script&gt;
 &lt;/body&gt;
@@ -11737,7 +11626,6 @@ window.__FOODLENS_NUMBER_SCANNER=start;
         setTimeout(function(){
           try{
             if(rw && typeof rw.displayProduct==="function"){
-              rw.__foodLensCurrentProduct = normalized;
               rw.displayProduct(normalized);
               if(rw.document.getElementById("scannedBarcode"))
                 rw.document.getElementById("scannedBarcode").textContent=
@@ -13891,7 +13779,6 @@ if(frame)frame.addEventListener("load",function(){
     setTimeout(function(){
       try{
         if(resultWindow && typeof resultWindow.displayProduct === "function"){
-          resultWindow.__foodLensCurrentProduct = product;
           resultWindow.displayProduct(product);
 
           var scanned = resultWindow.document.getElementById("scannedBarcode");
@@ -14777,9 +14664,6 @@ if(frame)frame.addEventListener("load",function(){
 
       product = product || {};
 
-      /* Keep the latest backend product available to the result-frame interactions. */
-      try{ rw.__foodLensCurrentProduct = product; }catch(e){}
-
       /*
        * Existing renderer remains in charge of the design.
        */
@@ -15153,7 +15037,6 @@ if(frame)frame.addEventListener("load",function(){
         if(current &&
            typeof current.displayProduct === "function"){
 
-          current.__foodLensCurrentProduct = product;
           current.displayProduct(product);
 
           var scanned =
