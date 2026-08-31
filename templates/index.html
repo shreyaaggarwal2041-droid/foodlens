@@ -10602,6 +10602,34 @@ document.addEventListener("keydown",foodLensIntroAfterInteraction);
  };
 })();
 </script>
+<script id="foodlensFriendBackendExactFinal">
+(function(){
+  "use strict";
+  function getResult(){try{return document.getElementById("frame-result")?.contentWindow||null}catch(e){return null}}
+  function digits(v){return String(v==null?"":v).replace(/\D/g,"")}
+  function validBarcode(c){return /^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(c)}
+  function lang(){return localStorage.getItem("foodlensLanguage")==="hi"?"hi":"en"}
+  function normalize(data,code){
+    data=data||{}; var p=(data.product&&typeof data.product==="object")?data.product:data;
+    var n=p.nutrition||p.nutriments||{}, f=p.foodlens||{}, h=p.health_assessment||{};
+    function num(v){if(v==null||v==="")return null;var x=Number(v);return Number.isFinite(x)?x:null}
+    var su=num(n.sugar_g_100g??n.sugars_100g??n.sugars??n.sugar_g), so=num(n.sodium_mg_100g??n.sodium_mg), fi=num(n.dietary_fiber_g_100g??n.fiber_g_100g??n.fibre_g_100g??n.fiber_g??n.fibre_g), pr=num(n.protein_g_100g??n.proteins_100g??n.protein_g);
+    return {barcode:p.barcode||p.code||code,name:p.name||p.product_name||p.product_name_en||p.product||"Product information unavailable",brand:p.brand||p.brands||"Food product",image:p.image||p.image_front_url||p.image_front_small_url||p.image_url||"",score:f.score??h.score??p.score??p.nutriscore??p.nutriscore_grade??"—",scoreCategory:f.category||h.category||p.scoreCategory||"",recommendation:f.recommendation||h.recommendation||p.recommendation||"",nutrition:{sugar:su==null?"—":su.toFixed(1)+"g",sodium:so==null?"—":Math.round(so)+"mg",fibre:fi==null?"—":fi.toFixed(1)+"g",protein:pr==null?"—":pr.toFixed(1)+"g"},ingredients:p.ingredients||p.ingredients_text||p.ingredients_text_en||""}
+  }
+  async function lookup(code){
+    code=digits(code); if(!validBarcode(code))return null;
+    try{var r=await fetch("/get_food_data?query="+encodeURIComponent(code),{headers:{Accept:"application/json"},cache:"no-store"});var d=await r.json();console.log("[FoodLens] Flask",r.status,d);if(r.ok&&d){var x=normalize(d,code);if(x.name&&x.name!=="Product information unavailable")return x}}catch(e){console.error("Flask lookup",e)}
+    try{var r2=await fetch("https://world.openfoodfacts.org/api/v2/product/"+encodeURIComponent(code)+".json?fields=code,product_name,product_name_en,brands,image_front_small_url,image_front_url,nutrition_grades,nutriscore_grade,nutriscore_score,nutriments,ingredients_text,ingredients_text_en",{cache:"no-store"});var d2=await r2.json();if(r2.ok&&d2.status===1&&d2.product){var p=d2.product,n=p.nutriments||{};function nv(v){var x=Number(v);return Number.isFinite(x)?x:null}var su=nv(n.sugars_100g),so=nv(n.sodium_100g),fi=nv(n.fiber_100g),pr=nv(n.proteins_100g),g=String(p.nutriscore_grade||p.nutrition_grades||"").toLowerCase(),m={a:"9.5",b:"8.0",c:"6.5",d:"4.5",e:"2.5"},sc=m[g]||"—";if(sc==="—"){var ns=nv(p.nutriscore_score);if(ns!==null)sc=Math.max(0,Math.min(10,10-((ns+15)/50)*10)).toFixed(1)}return {barcode:code,name:p.product_name||p.product_name_en||p.brands||("Product "+code),brand:p.brands||"Food product",image:p.image_front_small_url||p.image_front_url||"",score:sc,nutrition:{sugar:su==null?"—":su.toFixed(1)+"g",sodium:so==null?"—":Math.round(so)+"mg",fibre:fi==null?"—":fi.toFixed(1)+"g",protein:pr==null?"—":pr.toFixed(1)+"g"},ingredients:p.ingredients_text||p.ingredients_text_en||""}}}catch(e){console.error("OFF fallback",e)}
+    return {barcode:code,name:"Product information unavailable",brand:"Barcode: "+code,image:"",score:"—",nutrition:{sugar:"—",sodium:"—",fibre:"—",protein:"—"},ingredients:""}
+  }
+  function patch(){var rw=getResult();if(!rw||!rw.document||typeof rw.displayProduct!=="function")return false;var original=rw.displayProduct;if(original.__flPatched)return true;function wrapped(product){product=product||{};try{original(product)}catch(e){}var d=rw.document;var n=d.getElementById("productName");if(n)n.textContent=product.name||"Product information unavailable";var b=d.getElementById("productBrand");if(b)b.textContent=product.brand||"Food product";var s=d.getElementById("productScore");if(s)s.textContent=product.score==null?"—":String(product.score);var l=d.getElementById("scoreLabel");if(l)l.textContent=product.scoreCategory||"FoodLens score";var ex=d.getElementById("scoreExplain");if(ex&&product.recommendation)ex.textContent=product.recommendation;var q=product.nutrition||{};["sugar","sodium","fibre","protein"].forEach(function(k){var el=d.getElementById(k);if(el)el.textContent=q[k]||"—"});var ib=d.getElementById("productImage");if(ib){var im=String(product.image||"").trim();ib.innerHTML="";if(/^https?:\/\//i.test(im)){var img=d.createElement("img");img.src=im;img.alt=product.name||"Product image";img.style.width="100%";img.style.height="100%";img.style.objectFit="contain";img.style.display="block";img.style.borderRadius="16px";img.onerror=function(){ib.textContent="🍽️"};ib.appendChild(img)}else ib.textContent=im||"🍽️"}var bc=d.getElementById("scannedBarcode");if(bc)bc.textContent=(lang()==="hi"?"बारकोड: ":"Barcode: ")+String(product.barcode||"")}
+    wrapped.__flPatched=true;rw.displayProduct=wrapped;return true}
+  async function show(code){code=digits(code);if(!validBarcode(code))return;try{localStorage.setItem("foodlensLastBarcode",code)}catch(e){}try{window.foodLensShow?.("result")}catch(e){}var product=await lookup(code);for(var i=0;i<60;i++){patch();var rw=getResult();if(rw&&rw.document&&typeof rw.displayProduct==="function"){try{rw.displayProduct(product);var bc=rw.document.getElementById("scannedBarcode");if(bc)bc.textContent=(lang()==="hi"?"बारकोड: ":"Barcode: ")+code;try{var h=JSON.parse(localStorage.getItem("foodlensHistory")||"[]");h=h.filter(x=>!x||x.barcode!==code);h.unshift({name:product.name,score:product.score,barcode:code,nutrition:product.nutrition||{},date:new Date().toLocaleDateString()});localStorage.setItem("foodlensHistory",JSON.stringify(h.slice(0,20)))}catch(e){}return}catch(e){}}await new Promise(r=>setTimeout(r,100))}}
+  window.displayProductForBarcode=show;
+  var frame=document.getElementById("frame-result");if(frame)frame.addEventListener("load",function(){setTimeout(patch,50);setTimeout(patch,300)})
+})();
+</script>
+
 </body></html>
 <style>
 #foodlensLanguageModal{position:fixed;inset:0;z-index:200000;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);font-family:Arial,sans-serif}
@@ -11320,6 +11348,34 @@ window.addEventListener("message",function(e){
 
 window.__FOODLENS_NUMBER_SCANNER=start;
 
+})();
+</script>
+
+<script id="foodlensFriendBackendExactFinal">
+(function(){
+  "use strict";
+  function getResult(){try{return document.getElementById("frame-result")?.contentWindow||null}catch(e){return null}}
+  function digits(v){return String(v==null?"":v).replace(/\D/g,"")}
+  function validBarcode(c){return /^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(c)}
+  function lang(){return localStorage.getItem("foodlensLanguage")==="hi"?"hi":"en"}
+  function normalize(data,code){
+    data=data||{}; var p=(data.product&&typeof data.product==="object")?data.product:data;
+    var n=p.nutrition||p.nutriments||{}, f=p.foodlens||{}, h=p.health_assessment||{};
+    function num(v){if(v==null||v==="")return null;var x=Number(v);return Number.isFinite(x)?x:null}
+    var su=num(n.sugar_g_100g??n.sugars_100g??n.sugars??n.sugar_g), so=num(n.sodium_mg_100g??n.sodium_mg), fi=num(n.dietary_fiber_g_100g??n.fiber_g_100g??n.fibre_g_100g??n.fiber_g??n.fibre_g), pr=num(n.protein_g_100g??n.proteins_100g??n.protein_g);
+    return {barcode:p.barcode||p.code||code,name:p.name||p.product_name||p.product_name_en||p.product||"Product information unavailable",brand:p.brand||p.brands||"Food product",image:p.image||p.image_front_url||p.image_front_small_url||p.image_url||"",score:f.score??h.score??p.score??p.nutriscore??p.nutriscore_grade??"—",scoreCategory:f.category||h.category||p.scoreCategory||"",recommendation:f.recommendation||h.recommendation||p.recommendation||"",nutrition:{sugar:su==null?"—":su.toFixed(1)+"g",sodium:so==null?"—":Math.round(so)+"mg",fibre:fi==null?"—":fi.toFixed(1)+"g",protein:pr==null?"—":pr.toFixed(1)+"g"},ingredients:p.ingredients||p.ingredients_text||p.ingredients_text_en||""}
+  }
+  async function lookup(code){
+    code=digits(code); if(!validBarcode(code))return null;
+    try{var r=await fetch("/get_food_data?query="+encodeURIComponent(code),{headers:{Accept:"application/json"},cache:"no-store"});var d=await r.json();console.log("[FoodLens] Flask",r.status,d);if(r.ok&&d){var x=normalize(d,code);if(x.name&&x.name!=="Product information unavailable")return x}}catch(e){console.error("Flask lookup",e)}
+    try{var r2=await fetch("https://world.openfoodfacts.org/api/v2/product/"+encodeURIComponent(code)+".json?fields=code,product_name,product_name_en,brands,image_front_small_url,image_front_url,nutrition_grades,nutriscore_grade,nutriscore_score,nutriments,ingredients_text,ingredients_text_en",{cache:"no-store"});var d2=await r2.json();if(r2.ok&&d2.status===1&&d2.product){var p=d2.product,n=p.nutriments||{};function nv(v){var x=Number(v);return Number.isFinite(x)?x:null}var su=nv(n.sugars_100g),so=nv(n.sodium_100g),fi=nv(n.fiber_100g),pr=nv(n.proteins_100g),g=String(p.nutriscore_grade||p.nutrition_grades||"").toLowerCase(),m={a:"9.5",b:"8.0",c:"6.5",d:"4.5",e:"2.5"},sc=m[g]||"—";if(sc==="—"){var ns=nv(p.nutriscore_score);if(ns!==null)sc=Math.max(0,Math.min(10,10-((ns+15)/50)*10)).toFixed(1)}return {barcode:code,name:p.product_name||p.product_name_en||p.brands||("Product "+code),brand:p.brands||"Food product",image:p.image_front_small_url||p.image_front_url||"",score:sc,nutrition:{sugar:su==null?"—":su.toFixed(1)+"g",sodium:so==null?"—":Math.round(so)+"mg",fibre:fi==null?"—":fi.toFixed(1)+"g",protein:pr==null?"—":pr.toFixed(1)+"g"},ingredients:p.ingredients_text||p.ingredients_text_en||""}}}catch(e){console.error("OFF fallback",e)}
+    return {barcode:code,name:"Product information unavailable",brand:"Barcode: "+code,image:"",score:"—",nutrition:{sugar:"—",sodium:"—",fibre:"—",protein:"—"},ingredients:""}
+  }
+  function patch(){var rw=getResult();if(!rw||!rw.document||typeof rw.displayProduct!=="function")return false;var original=rw.displayProduct;if(original.__flPatched)return true;function wrapped(product){product=product||{};try{original(product)}catch(e){}var d=rw.document;var n=d.getElementById("productName");if(n)n.textContent=product.name||"Product information unavailable";var b=d.getElementById("productBrand");if(b)b.textContent=product.brand||"Food product";var s=d.getElementById("productScore");if(s)s.textContent=product.score==null?"—":String(product.score);var l=d.getElementById("scoreLabel");if(l)l.textContent=product.scoreCategory||"FoodLens score";var ex=d.getElementById("scoreExplain");if(ex&&product.recommendation)ex.textContent=product.recommendation;var q=product.nutrition||{};["sugar","sodium","fibre","protein"].forEach(function(k){var el=d.getElementById(k);if(el)el.textContent=q[k]||"—"});var ib=d.getElementById("productImage");if(ib){var im=String(product.image||"").trim();ib.innerHTML="";if(/^https?:\/\//i.test(im)){var img=d.createElement("img");img.src=im;img.alt=product.name||"Product image";img.style.width="100%";img.style.height="100%";img.style.objectFit="contain";img.style.display="block";img.style.borderRadius="16px";img.onerror=function(){ib.textContent="🍽️"};ib.appendChild(img)}else ib.textContent=im||"🍽️"}var bc=d.getElementById("scannedBarcode");if(bc)bc.textContent=(lang()==="hi"?"बारकोड: ":"Barcode: ")+String(product.barcode||"")}
+    wrapped.__flPatched=true;rw.displayProduct=wrapped;return true}
+  async function show(code){code=digits(code);if(!validBarcode(code))return;try{localStorage.setItem("foodlensLastBarcode",code)}catch(e){}try{window.foodLensShow?.("result")}catch(e){}var product=await lookup(code);for(var i=0;i<60;i++){patch();var rw=getResult();if(rw&&rw.document&&typeof rw.displayProduct==="function"){try{rw.displayProduct(product);var bc=rw.document.getElementById("scannedBarcode");if(bc)bc.textContent=(lang()==="hi"?"बारकोड: ":"Barcode: ")+code;try{var h=JSON.parse(localStorage.getItem("foodlensHistory")||"[]");h=h.filter(x=>!x||x.barcode!==code);h.unshift({name:product.name,score:product.score,barcode:code,nutrition:product.nutrition||{},date:new Date().toLocaleDateString()});localStorage.setItem("foodlensHistory",JSON.stringify(h.slice(0,20)))}catch(e){}return}catch(e){}}await new Promise(r=>setTimeout(r,100))}}
+  window.displayProductForBarcode=show;
+  var frame=document.getElementById("frame-result");if(frame)frame.addEventListener("load",function(){setTimeout(patch,50);setTimeout(patch,300)})
 })();
 </script>
 
@@ -13678,96 +13734,41 @@ if(frame)frame.addEventListener("load",function(){
   }
 
   async function lookupProduct(code){
-    code = digits(code);
-    if(!isRetailBarcode(code)) return null;
-
-    function num(v){
-      if(v === null || v === undefined || v === "") return null;
-      var x = Number(v);
-      return Number.isFinite(x) ? x : null;
-    }
-
-    function normalizeBackend(data){
-      data = data || {};
-      var p = (data.product && typeof data.product === "object") ? data.product : data;
-      var n = p.nutrition || p.nutriments || {};
-      var f = p.foodlens || {};
-      var h = p.health_assessment || {};
-
-      var sugar = num(n.sugar_g_100g ?? n.sugars_100g ?? n.sugars ?? n.sugar_g);
-      var sodium = num(n.sodium_mg_100g ?? n.sodium_mg);
-      var fibre = num(n.dietary_fiber_g_100g ?? n.fiber_g_100g ?? n.fibre_g_100g ?? n.fiber_g ?? n.fibre_g);
-      var protein = num(n.protein_g_100g ?? n.proteins_100g ?? n.protein_g);
-
-      return {
-        barcode: p.barcode || p.code || code,
-        name: p.name || p.product_name || p.product_name_en || "Product information unavailable",
-        brand: p.brand || p.brands || "Food product",
-        image: p.image || p.image_front_url || p.image_front_small_url || p.image_url || "",
-        score: f.score ?? h.score ?? p.score ?? p.nutriscore ?? p.nutriscore_grade ?? "—",
-        scoreCategory: f.category || h.category || p.scoreCategory || "",
-        recommendation: f.recommendation || p.recommendation || "",
-        nutrition: {
-          sugar: sugar === null ? "—" : sugar.toFixed(1) + "g",
-          sodium: sodium === null ? "—" : Math.round(sodium) + "mg",
-          fibre: fibre === null ? "—" : fibre.toFixed(1) + "g",
-          protein: protein === null ? "—" : protein.toFixed(1) + "g"
-        },
-        ingredients: p.ingredients || p.ingredients_text || p.ingredients_text_en || "",
-        backend: p
-      };
-    }
-
-    /* FIRST: the same Flask endpoint used by the working friend's app. */
+    /*
+      This is the single lookup hook.
+      The backend/API developer can replace this fetch later without touching
+      the scanner. Open Food Facts is the current fallback data source.
+    */
     try{
       var response = await fetch(
-        "/get_food_data?query=" + encodeURIComponent(code),
-        {
-          method:"GET",
-          headers:{"Accept":"application/json"},
-          cache:"no-store"
-        }
-      );
-
-      var data = null;
-      try{ data = await response.json(); }catch(e){}
-
-      if(response.ok && data){
-        var product = normalizeBackend(data);
-        if(product && product.name && product.name !== "Product information unavailable"){
-          return product;
-        }
-      }
-    }catch(error){
-      console.warn("FoodLens Flask lookup failed; trying Open Food Facts fallback:",error);
-    }
-
-    /* FALLBACK: keep the existing working product lookup if Flask has no record. */
-    try{
-      var off = await fetch(
         "https://world.openfoodfacts.org/api/v2/product/" +
         encodeURIComponent(code) +
-        ".json?fields=code,product_name,product_name_en,brands,image_front_small_url,image_front_url,nutrition_grades,nutriscore_grade,nutriscore_score,nutriments,ingredients_text,ingredients_text_en"
+        ".json?fields=code,product_name,product_name_en,brands,image_front_small_url,nutrition_grades,nutriscore_grade,nutriscore_score,nutriments,ingredients_text,ingredients_text_en"
       );
 
-      if(off.ok){
-        var offData = await off.json();
-        if(offData && offData.status === 1 && offData.product){
-          return normalizeProduct(offData.product,code);
+      if(response.ok){
+        var data = await response.json();
+        if(data && data.status === 1 && data.product){
+          return normalizeProduct(data.product, code);
         }
       }
     }catch(error){
-      console.warn("FoodLens Open Food Facts fallback failed:",error);
+      console.warn("Barcode product lookup failed:", error);
     }
 
     return {
-      barcode:code,
-      name:"Product information unavailable",
-      brand:"Barcode: " + code,
-      image:"",
-      score:"—",
-      nutrition:{sugar:"—",sodium:"—",fibre:"—",protein:"—"},
-      ingredients:""
+      barcode: code,
+      name: "Product information pending",
+      brand: "Barcode: " + code,
+      image: "🍽️",
+      score: "—",
+      nutrition: {
+        sugar: "—",
+        sodium: "—",
+        fibre: "—",
+        protein: "—"
+      },
+      ingredients: ""
     };
   }
 
@@ -13775,66 +13776,67 @@ if(frame)frame.addEventListener("load",function(){
     code = digits(code);
     if(!isRetailBarcode(code)) return;
 
-    try{ localStorage.setItem("foodlensLastBarcode",code); }catch(e){}
+    try{ localStorage.setItem("foodlensLastBarcode", code); }catch(e){}
 
-    /* EXACT FRIEND FLOW: open result, fetch product, then call existing displayProduct(). */
-    try{ window.foodLensShow?.("result"); }catch(e){}
-
-    var loading = {
-      barcode:code,
-      name:"Loading product information…",
-      brand:"Barcode: " + code,
-      image:"🍽️",
-      score:"—",
-      nutrition:{sugar:"—",sodium:"—",fibre:"—",protein:"—"},
-      ingredients:""
-    };
-
-    function render(product){
-      try{
-        var rw = getResult();
-        if(!rw || !rw.document || typeof rw.displayProduct !== "function") return false;
-        rw.displayProduct(product);
-        var scanned = rw.document.getElementById("scannedBarcode");
-        if(scanned) scanned.textContent = "Barcode: " + code;
-        return true;
-      }catch(error){
-        console.error("FoodLens result render failed:",error);
-        return false;
-      }
-    }
-
-    /* Wait for the result iframe instead of assuming it is ready after 80ms. */
-    for(var i=0;i<30;i++){
-      if(render(loading)) break;
-      await new Promise(function(resolve){setTimeout(resolve,100);});
-    }
-
-    var product = await lookupProduct(code);
-
-    /* Save exactly the product that was displayed. */
-    try{ saveHistory(product); }catch(e){}
-
-    /* Keep trying until the existing result screen accepts the product. */
-    for(var j=0;j<30;j++){
-      if(render(product)) break;
-      await new Promise(function(resolve){setTimeout(resolve,100);});
-    }
-
+    /*
+      Move to the result page immediately, then populate it when lookup
+      completes. This makes the captured barcode visibly useful even when
+      the product API is slow.
+    */
     try{
-      var rw2=getResult();
-      if(rw2 && rw2.document){
-        var explain=rw2.document.getElementById("scoreExplain");
-        if(explain && product.name === "Product information unavailable"){
-          explain.textContent="Barcode " + code + " was captured, but product information is unavailable.";
-        }
-        var category=rw2.document.getElementById("scoreLabel");
-        if(category && product.scoreCategory) category.textContent=product.scoreCategory;
+      if(typeof window.foodLensShow === "function"){
+        window.foodLensShow("result");
       }
     }catch(e){}
+
+    var resultWindow = getResult();
+    var initialProduct = {
+      barcode: code,
+      name: "Loading product information…",
+      brand: "Barcode: " + code,
+      image: "🍽️",
+      score: "—",
+      nutrition: {
+        sugar: "—",
+        sodium: "—",
+        fibre: "—",
+        protein: "—"
+      },
+      ingredients: ""
+    };
+
+    setTimeout(function(){
+      try{
+        resultWindow?.displayProduct?.(initialProduct);
+        var scanned = resultWindow?.document?.getElementById("scannedBarcode");
+        if(scanned) scanned.textContent = "Barcode: " + code;
+      }catch(e){}
+    }, 80);
+
+    var product = await lookupProduct(code);
+    saveHistory(product);
+
+    setTimeout(function(){
+      try{
+        if(resultWindow && typeof resultWindow.displayProduct === "function"){
+          resultWindow.displayProduct(product);
+
+          var scanned = resultWindow.document.getElementById("scannedBarcode");
+          if(scanned) scanned.textContent = "Barcode: " + code;
+
+          var explain = resultWindow.document.getElementById("scoreExplain");
+          if(explain && product.name === "Product information pending"){
+            explain.textContent =
+              "Barcode " + code +
+              " was captured successfully. Product information is not available from the current database yet.";
+          }
+        }
+      }catch(e){
+        console.error("Product result display failed:", e);
+      }
+    }, 120);
   }
 
-  
   /*
    * ONE destination for camera, manual entry, and any future backend/API
    * method. If another part of the app already calls home.processBarcode(),
