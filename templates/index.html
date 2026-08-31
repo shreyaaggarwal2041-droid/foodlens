@@ -14426,800 +14426,254 @@ if(frame)frame.addEventListener("load",function(){
 
 })();
 </script>
-
-
 <!-- =========================================================
-     FOODLENS — FINAL BACKEND PRODUCT PIPELINE
-     KEEP ALL EXISTING UI / ANIMATIONS / SCANNER DESIGN.
-     Only replace the barcode -> backend -> result connection.
-
-     Based on the working friend's flow:
-       barcode
-          -> /get_food_data?query=BARCODE
-          -> normalize response
-          -> existing result-frame displayProduct()
-
-     This backend returns the product directly:
-       name, brand, image, foodlens, health_assessment,
-       nutrition, consumption_guidance, ingredients, etc.
+     FOODLENS — RESULT SCREEN FIX
+     Uses the Flask /get_food_data endpoint and reliably pushes
+     the returned product into the EXISTING result screen.
      ========================================================= -->
-<script id="foodlensFinalBackendProductPipeline">
+<script id="foodlensResultScreenFix">
 (function(){
   "use strict";
 
-  var TOP = window;
-
-  function getHome(){
-    try{
-      return document.getElementById("frame-home")?.contentWindow || null;
-    }catch(e){ return null; }
+  function homeFrame(){
+    return document.getElementById("frame-home")?.contentWindow || null;
   }
-
-  function getResult(){
-    try{
-      return document.getElementById("frame-result")?.contentWindow || null;
-    }catch(e){ return null; }
+  function resultFrame(){
+    return document.getElementById("frame-result")?.contentWindow || null;
   }
-
-  function digits(v){
-    return String(v == null ? "" : v).replace(/\D/g,"");
+  function cleanBarcode(v){
+    return String(v == null ? "" : v).replace(/\D/g, "");
   }
-
-  function validBarcode(code){
-    return /^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(code);
+  function validBarcode(v){
+    return /^(?:\d{8}|\d{12}|\d{13}|\d{14})$/.test(v);
   }
-
   function lang(){
-    return localStorage.getItem("foodlensLanguage") === "hi"
-      ? "hi"
-      : "en";
+    return localStorage.getItem("foodlensLanguage") === "hi" ? "hi" : "en";
   }
 
-  /*
-   * YOUR Flask backend returns the fields directly.
-   * This mapping converts those fields to the exact object
-   * shape that YOUR existing result displayProduct() expects.
-   *
-   * It also accepts the friend's older backend shape
-   * (data.product / data.macros) so the frontend is tolerant.
-   */
-  function normalizeBackend(data, code){
-
-    data = data || {};
-
-    if(data.product && typeof data.product === "object"){
-      data = data.product;
-    }
-
-    var n = data.nutrition || {};
-    var f = data.foodlens || {};
-    var h = data.health_assessment || {};
-
-    /*
-     * Friend-compatible fallback.
-     */
-    if(data.macros && !Object.keys(n).length){
-      return {
-        barcode: code,
-        name: data.name || "Product information unavailable",
-        brand: data.brand || "Food product",
-        image: data.image || "",
-        score: data.score ?? data.nutriscore ?? "—",
-        nutrition:{
-          sugar: data.macros.sugar ?? "—",
-          sodium: data.macros.sodium ?? "—",
-          fibre: data.macros.fibre ?? "—",
-          protein: data.macros.proteins ?? "—"
-        },
-        ingredients: data.ingredients || ""
-      };
-    }
-
-    function num(v){
-      if(v === null || v === undefined || v === "") return null;
-      var x = Number(v);
-      return Number.isFinite(x) ? x : null;
-    }
-
-    var sugar = num(
-      n.sugar_g_100g ??
-      n.sugars_100g ??
-      n.sugar_g
-    );
-
-    var sodium = num(
-      n.sodium_mg_100g ??
-      n.sodium_mg
-    );
-
-    var fibre = num(
-      n.dietary_fiber_g_100g ??
-      n.fiber_g_100g ??
-      n.fiber_g ??
-      n.fibre_g
-    );
-
-    var protein = num(
-      n.protein_g_100g ??
-      n.proteins_100g ??
-      n.protein_g
-    );
-
-    var score =
-      f.score ??
-      h.score ??
-      data.score ??
-      "—";
-
+  /* Convert YOUR Flask response into the exact object the result page needs. */
+  function toResultProduct(data, barcode){
+    var n = data?.nutrition || {};
+    var f = data?.foodlens || {};
     return {
-      barcode: data.barcode || code,
-
-      /* THIS brings the product name back. */
-      name:
-        data.name ||
-        data.product_name ||
-        data.product_name_en ||
-        "Product information unavailable",
-
-      brand:
-        data.brand ||
-        data.brands ||
-        "Food product",
-
-      /* Keep the real OFF image URL from Flask. */
-      image:
-        data.image ||
-        data.image_front_url ||
-        data.image_url ||
-        "",
-
-      score: score,
-
-      scoreCategory:
-        f.category ||
-        h.category ||
-        "",
-
-      recommendation:
-        f.recommendation ||
-        data.recommendation ||
-        "",
-
-      nutrition:{
-        sugar:
-          sugar === null
-            ? "—"
-            : sugar.toFixed(1) + "g",
-
-        sodium:
-          sodium === null
-            ? "—"
-            : Math.round(sodium) + "mg",
-
-        fibre:
-          fibre === null
-            ? "—"
-            : fibre.toFixed(1) + "g",
-
-        protein:
-          protein === null
-            ? "—"
-            : protein.toFixed(1) + "g"
+      barcode: barcode,
+      name: data?.name || ("Product " + barcode),
+      brand: data?.brand || "Food product",
+      image: data?.image || "",
+      score: f?.score ?? data?.health_assessment?.score ?? "—",
+      category: f?.category || data?.health_assessment?.category || "",
+      recommendation: f?.recommendation || "",
+      nutrition: {
+        sugar: n.sugar_g_100g != null ? String(n.sugar_g_100g) + "g" : "—",
+        sodium: n.sodium_mg_100g != null ? String(Math.round(Number(n.sodium_mg_100g))) + "mg" : "—",
+        fibre: n.dietary_fiber_g_100g != null ? String(n.dietary_fiber_g_100g) + "g" : "—",
+        protein: n.protein_g_100g != null ? String(n.protein_g_100g) + "g" : "—"
       },
-
-      /*
-       * Preserve the full backend object for the existing
-       * result page's additional sections.
-       */
-      backend:data,
-
-      ingredients:
-        data.ingredients ||
-        data.ingredients_text ||
-        data.ingredients_text_en ||
-        ""
+      ingredients: data?.ingredients || ""
     };
   }
 
+  function saveResultHistory(product){
+    try{
+      var h = JSON.parse(localStorage.getItem("foodlensHistory") || "[]");
+      if(!Array.isArray(h)) h=[];
+      h = h.filter(function(x){
+        return !(x && x.barcode && product.barcode && x.barcode === product.barcode);
+      });
+      h.unshift({
+        name: product.name,
+        score: product.score,
+        barcode: product.barcode,
+        nutrition: product.nutrition || {},
+        date: new Date().toLocaleDateString()
+      });
+      localStorage.setItem("foodlensHistory", JSON.stringify(h.slice(0,20)));
+    }catch(e){ console.warn("History save failed",e); }
+  }
+
   /*
-   * PATCH THE EXISTING RESULT RENDERER.
-   *
-   * We do NOT redesign the result page.
-   * We first run its original displayProduct(),
-   * then fix only the fields needed for real backend data.
+   * Replace the old result renderer inside the result iframe.
+   * The old renderer wrote the image URL into textContent and saved history
+   * itself, which made the result screen fragile when called from the parent.
    */
-  function patchResultFrame(){
-
-    var rw = getResult();
-
+  function installResultRenderer(){
+    var rw = resultFrame();
     if(!rw || !rw.document) return false;
 
-    var original = rw.displayProduct;
+    try{
+      rw.displayProduct = function(product){
+        product = product || {};
+        product.nutrition = product.nutrition || {};
+        var d = rw.document;
+        function el(id){ return d.getElementById(id); }
 
-    if(typeof original !== "function"){
+        var name = el("productName");
+        var brand = el("productBrand");
+        var image = el("productImage");
+        var score = el("productScore");
+        var label = el("scoreLabel");
+        var explain = el("scoreExplain");
+        var sugar = el("sugar");
+        var sodium = el("sodium");
+        var fibre = el("fibre");
+        var protein = el("protein");
+        var scanned = el("scannedBarcode");
+
+        if(name) name.textContent = product.name || "Product information unavailable";
+        if(brand) brand.textContent = product.brand || "Food product";
+        if(score) score.textContent = product.score ?? "—";
+        if(label) label.textContent = product.category || "FoodLens score";
+        if(sugar) sugar.textContent = product.nutrition.sugar ?? "—";
+        if(sodium) sodium.textContent = product.nutrition.sodium ?? "—";
+        if(fibre) fibre.textContent = product.nutrition.fibre ?? "—";
+        if(protein) protein.textContent = product.nutrition.protein ?? "—";
+        if(scanned) scanned.textContent = product.barcode ? ((lang()==="hi"?"बारकोड: ":"Barcode: ") + product.barcode) : "";
+
+        if(explain){
+          explain.textContent = product.recommendation ||
+            (lang()==="hi"
+              ? "FoodLens इस उत्पाद के पोषण संकेतकों के आधार पर यह स्कोर देता है।"
+              : "FoodLens considers the product's nutrition indicators to generate this score.");
+        }
+
+        /* Properly render the product image instead of displaying its URL. */
+        if(image){
+          image.innerHTML = "";
+          var src = String(product.image || "");
+          if(/^https?:\/\//i.test(src)){
+            var img = d.createElement("img");
+            img.src = src;
+            img.alt = product.name || "Product image";
+            img.loading = "eager";
+            img.referrerPolicy = "no-referrer";
+            img.style.cssText = "width:100%;height:100%;object-fit:contain;border-radius:14px;display:block;";
+            img.onerror = function(){ image.textContent = "🍽️"; };
+            image.appendChild(img);
+          }else{
+            image.textContent = src || "🍽️";
+          }
+        }
+
+        /* Reuse the existing ingredient explanation logic if present. */
+        try{
+          if(typeof rw.findDifficultTerms === "function" && typeof rw.renderTerms === "function"){
+            rw.renderTerms(rw.findDifficultTerms(product.ingredients || ""));
+          }
+        }catch(e){ console.warn("Ingredient rendering failed",e); }
+
+        /* Keep the existing alternative card behaviour. */
+        var an=el("alternativeName"), as=el("alternativeScore");
+        if(an && !an.textContent.trim()) an.textContent="Oat Biscuits";
+        if(as && !as.textContent.trim()) as.textContent="8.2";
+      };
+      rw.__foodLensResultRendererInstalled = true;
+      return true;
+    }catch(e){
+      console.warn("Could not install result renderer",e);
       return false;
     }
-
-    if(original.__foodLensBackendPatched){
-      return true;
-    }
-
-    function patched(product){
-
-      product = product || {};
-
-      /*
-       * Existing renderer remains in charge of the design.
-       */
-      try{
-        original(product);
-      }catch(e){
-        console.error(
-          "[FoodLens] Existing result renderer error:",
-          e
-        );
-      }
-
-      var d = rw.document;
-
-      /*
-       * NAME — force the actual backend name.
-       */
-      var name = d.getElementById("productName");
-
-      if(name){
-        name.textContent =
-          product.name ||
-          "Product information unavailable";
-      }
-
-      /*
-       * BRAND.
-       */
-      var brand = d.getElementById("productBrand");
-
-      if(brand){
-        brand.textContent =
-          product.brand ||
-          "Food product";
-      }
-
-      /*
-       * SCORE.
-       */
-      var score = d.getElementById("productScore");
-
-      if(score){
-        score.textContent =
-          product.score == null
-            ? "—"
-            : String(product.score);
-      }
-
-      /*
-       * CATEGORY / SCORE LABEL.
-       */
-      var scoreLabel =
-        d.getElementById("scoreLabel");
-
-      if(scoreLabel){
-
-        scoreLabel.textContent =
-          product.scoreCategory ||
-          "FoodLens score";
-      }
-
-      /*
-       * WHY THIS SCORE / RECOMMENDATION.
-       */
-      var scoreExplain =
-        d.getElementById("scoreExplain");
-
-      if(scoreExplain &&
-         product.recommendation){
-
-        scoreExplain.textContent =
-          product.recommendation;
-      }
-
-      /*
-       * NUTRITION.
-       */
-      var nn = product.nutrition || {};
-
-      var sugar = d.getElementById("sugar");
-      var sodium = d.getElementById("sodium");
-      var fibre = d.getElementById("fibre");
-      var protein = d.getElementById("protein");
-
-      if(sugar) sugar.textContent = nn.sugar || "—";
-      if(sodium) sodium.textContent = nn.sodium || "—";
-      if(fibre) fibre.textContent = nn.fibre || "—";
-      if(protein) protein.textContent = nn.protein || "—";
-
-      /*
-       * IMAGE:
-       * The old renderer put the URL into innerText.
-       * That is why your screenshot showed the long
-       * images.openfoodfacts.org URL across the page.
-       *
-       * Replace ONLY that content with an actual <img>.
-       */
-      var imageBox =
-        d.getElementById("productImage");
-
-      if(imageBox){
-
-        var image =
-          String(product.image || "").trim();
-
-        imageBox.innerHTML = "";
-
-        if(/^https?:\/\//i.test(image)){
-
-          var img =
-            d.createElement("img");
-
-          img.src = image;
-          img.alt =
-            product.name ||
-            "Product image";
-
-          img.loading = "eager";
-
-          img.style.width = "100%";
-          img.style.height = "100%";
-          img.style.objectFit = "contain";
-          img.style.display = "block";
-          img.style.borderRadius = "16px";
-
-          img.onerror=function(){
-            imageBox.textContent = "🍽️";
-          };
-
-          imageBox.appendChild(img);
-
-        }else{
-
-          imageBox.textContent =
-            image || "🍽️";
-        }
-      }
-
-      /*
-       * Barcode display.
-       */
-      var scanned =
-        d.getElementById("scannedBarcode");
-
-      if(scanned){
-
-        scanned.textContent =
-          (lang()==="hi"
-            ? "बारकोड: "
-            : "Barcode: ") +
-          String(
-            product.barcode || ""
-          );
-      }
-    }
-
-    patched.__foodLensBackendPatched = true;
-    patched.__foodLensOriginal = original;
-
-    rw.displayProduct = patched;
-
-    return true;
   }
 
-  /*
-   * THE IMPORTANT PART:
-   * This follows your friend's operational pattern,
-   * but uses YOUR Flask backend instead of a direct browser
-   * Open Food Facts request.
-   */
-  async function lookupProduct(code){
+  function showResultProduct(product, barcode){
+    localStorage.setItem("foodlensLastBarcode", barcode);
+    window.foodLensShow?.("result");
 
-    code = digits(code);
+    /* Result iframe can be a little late. Retry until its DOM is ready. */
+    var started = Date.now();
+    var timer = setInterval(function(){
+      var rw = resultFrame();
+      if(!rw) return;
+      if(installResultRenderer() && rw.document?.getElementById("productName")){
+        clearInterval(timer);
+        try{ rw.displayProduct(product); }catch(e){ console.error("Result render failed",e); }
+        return;
+      }
+      if(Date.now()-started > 8000) clearInterval(timer);
+    },100);
+  }
 
-    if(!validBarcode(code)){
+  async function fetchProductFromFlask(barcode){
+    var url = "/get_food_data?query=" + encodeURIComponent(barcode);
+    var response = await fetch(url, {method:"GET", headers:{"Accept":"application/json"}, cache:"no-store"});
+    var data = await response.json();
+    if(!response.ok) throw new Error(data?.error || ("Request failed: " + response.status));
+    return data;
+  }
 
-      return {
-        barcode:code,
-        name:
-          lang()==="hi"
-            ? "उत्पाद की जानकारी उपलब्ध नहीं है"
-            : "Product information unavailable",
-        brand:"FoodLens",
-        image:"",
-        score:"—",
-        nutrition:{
-          sugar:"—",
-          sodium:"—",
-          fibre:"—",
-          protein:"—"
-        },
+  /* This is now the SINGLE barcode -> backend -> result path. */
+  async function processBarcodeFixed(value){
+    var barcode = cleanBarcode(value);
+    if(!validBarcode(barcode)) return;
+
+    localStorage.setItem("foodlensLastBarcode", barcode);
+    var home = homeFrame();
+    try{ home?.closeRealCamera?.(); }catch(e){}
+    try{ home?.stopHomeAudio?.(); }catch(e){}
+
+    /* Open the existing result screen immediately. */
+    window.foodLensShow?.("result");
+
+    try{
+      var data = await fetchProductFromFlask(barcode);
+      var product = toResultProduct(data, barcode);
+      saveResultHistory(product);
+      showResultProduct(product, barcode);
+    }catch(error){
+      console.error("FoodLens product lookup failed:", error);
+      var fallback = {
+        barcode: barcode,
+        name: lang()==="hi" ? "उत्पाद की जानकारी उपलब्ध नहीं है" : "Product information unavailable",
+        brand: "Barcode: " + barcode,
+        image: "",
+        score: "—",
+        category: "FoodLens score",
+        recommendation: lang()==="hi"
+          ? "बारकोड सफलतापूर्वक पढ़ा गया, लेकिन उत्पाद डेटा प्राप्त नहीं हो सका।"
+          : "The barcode was read successfully, but product data could not be retrieved.",
+        nutrition:{sugar:"—",sodium:"—",fibre:"—",protein:"—"},
         ingredients:""
       };
-    }
-
-    console.log(
-      "[FoodLens] → Flask /get_food_data:",
-      code
-    );
-
-    try{
-
-      var response =
-        await fetch(
-          "/get_food_data?query=" +
-          encodeURIComponent(code),
-          {
-            method:"GET",
-            headers:{
-              "Accept":"application/json"
-            },
-            cache:"no-store"
-          }
-        );
-
-      console.log(
-        "[FoodLens] ← Flask status:",
-        response.status
-      );
-
-      var data = null;
-
-      try{
-        data = await response.json();
-      }catch(e){}
-
-      console.log(
-        "[FoodLens] ← Flask response:",
-        data
-      );
-
-      if(!response.ok){
-
-        throw new Error(
-          data?.error ||
-          (
-            "Backend returned HTTP " +
-            response.status
-          )
-        );
-      }
-
-      return normalizeBackend(
-        data,
-        code
-      );
-
-    }catch(error){
-
-      console.error(
-        "[FoodLens] Backend lookup failed:",
-        error
-      );
-
-      return {
-        barcode:code,
-
-        name:
-          lang()==="hi"
-            ? "उत्पाद की जानकारी उपलब्ध नहीं है"
-            : "Product information unavailable",
-
-        brand:
-          (lang()==="hi"
-            ? "बारकोड: "
-            : "Barcode: ") + code,
-
-        image:"",
-
-        score:"—",
-
-        nutrition:{
-          sugar:"—",
-          sodium:"—",
-          fibre:"—",
-          protein:"—"
-        },
-
-        ingredients:"",
-
-        backendError:
-          error.message || String(error)
-      };
+      showResultProduct(fallback, barcode);
     }
   }
 
-  /*
-   * ONE product-result destination.
-   * Camera, manual entry and any scanner callback use this.
-   */
-  async function displayProductForBarcode(code){
-
-    code = digits(code);
-
-    if(!validBarcode(code)) return;
-
-    try{
-      localStorage.setItem(
-        "foodlensLastBarcode",
-        code
-      );
-    }catch(e){}
-
-    /*
-     * Show the existing result screen.
-     */
-    try{
-      if(typeof TOP.foodLensShow === "function"){
-        TOP.foodLensShow("result");
-      }
-    }catch(e){}
-
-    /*
-     * Give the existing result frame a loading state.
-     */
-    var rw = getResult();
-
-    patchResultFrame();
-
-    setTimeout(function(){
-
-      try{
-
-        var current = getResult();
-
-        current?.displayProduct?.({
-          barcode:code,
-          name:
-            lang()==="hi"
-              ? "उत्पाद की जानकारी लोड हो रही है…"
-              : "Loading product information…",
-          brand:
-            (lang()==="hi"
-              ? "बारकोड: "
-              : "Barcode: ") + code,
-          image:"",
-          score:"—",
-          nutrition:{
-            sugar:"—",
-            sodium:"—",
-            fibre:"—",
-            protein:"—"
-          },
-          ingredients:""
-        });
-
-      }catch(e){}
-
-    },80);
-
-    /*
-     * NOW use the backend — exactly the missing step.
-     */
-    var product =
-      await lookupProduct(code);
-
-    /*
-     * Make sure the result frame has loaded its renderer.
-     */
-    patchResultFrame();
-
-    /*
-     * Existing renderer is now given the REAL backend product.
-     */
-    setTimeout(function(){
-
-      try{
-
-        var current = getResult();
-
-        if(current &&
-           typeof current.displayProduct === "function"){
-
-          current.displayProduct(product);
-
-          var scanned =
-            current.document.getElementById(
-              "scannedBarcode"
-            );
-
-          if(scanned){
-            scanned.textContent =
-              (lang()==="hi"
-                ? "बारकोड: "
-                : "Barcode: ") + code;
-          }
-
-          /*
-           * If backend failed, make that explicit
-           * instead of leaving "Waiting for scan".
-           */
-          if(product.backendError){
-
-            var explain =
-              current.document.getElementById(
-                "scoreExplain"
-              );
-
-            if(explain){
-
-              explain.textContent =
-                product.backendError;
-            }
-          }
-
-        }
-
-      }catch(error){
-
-        console.error(
-          "[FoodLens] Final product render failed:",
-          error
-        );
-      }
-
-    },120);
-
-    /*
-     * Save history ONCE here.
-     * The existing renderer may also save history, so avoid
-     * writing a second record ourselves.
-     */
-  }
-
-  /*
-   * Expose the SAME names your existing scanner already calls.
-   */
-  TOP.displayProductForBarcode =
-    displayProductForBarcode;
-
-  TOP.foodLensHandleBarcode =
-    function(value){
-
-      var code = digits(value);
-
-      if(validBarcode(code)){
-        displayProductForBarcode(code);
-      }
-    };
-
-  /*
-   * Reconnect the HOME iframe to this one route.
-   */
-  function installHome(){
-
-    var home = getHome();
-
+  function patchHome(){
+    var home = homeFrame();
     if(!home) return false;
-
-    home.processBarcode =
-      function(value){
-
-        var code = digits(value);
-
-        if(!validBarcode(code)) return;
-
-        try{
-          localStorage.setItem(
-            "foodlensLastBarcode",
-            code
-          );
-        }catch(e){}
-
-        displayProductForBarcode(code);
-      };
-
-    /*
-     * Manual barcode uses the SAME path.
-     */
-    home.manualBarcode =
-      function(){
-
-        var raw =
-          home.prompt(
-            lang()==="hi"
-              ? "बारकोड नंबर दर्ज करें:"
-              : "Enter product barcode:"
-          );
-
-        var code =
-          digits(raw);
-
-        if(!code) return;
-
-        if(!validBarcode(code)){
-
-          home.alert(
-            lang()==="hi"
-              ? "कृपया 8, 12, 13 या 14 अंकों का पूरा बारकोड दर्ज करें।"
-              : "Please enter a complete 8, 12, 13 or 14 digit barcode."
-          );
-
-          return;
-        }
-
-        displayProductForBarcode(code);
-      };
-
-    return true;
+    try{
+      home.processBarcode = processBarcodeFixed;
+      home.__foodLensProcessBarcodeFixed = true;
+      return true;
+    }catch(e){ return false; }
   }
 
-  /*
-   * Do NOT replace the existing scanner UI.
-   * Only reconnect its successful barcode output.
-   */
-  function install(){
+  /* Install now and again whenever either iframe reloads. */
+  patchHome();
+  installResultRenderer();
 
-    installHome();
-    patchResultFrame();
+  document.getElementById("frame-home")?.addEventListener("load",function(){
+    patchHome();
+    setTimeout(patchHome,100);
+    setTimeout(patchHome,500);
+    setTimeout(patchHome,1200);
+  });
+  document.getElementById("frame-result")?.addEventListener("load",function(){
+    installResultRenderer();
+  });
 
-    return true;
-  }
+  var attempts=0;
+  var retry=setInterval(function(){
+    patchHome();
+    installResultRenderer();
+    if(++attempts>50) clearInterval(retry);
+  },200);
 
-  install();
-
-  /*
-   * Iframes can reload. Reconnect after Home/Result loads.
-   */
-  ["frame-home","frame-result"].forEach(
-    function(id){
-
-      var frame =
-        document.getElementById(id);
-
-      if(frame){
-
-        frame.addEventListener(
-          "load",
-          function(){
-
-            install();
-
-            setTimeout(
-              install,
-              100
-            );
-
-            setTimeout(
-              install,
-              500
-            );
-
-            setTimeout(
-              install,
-              1200
-            );
-          }
-        );
-      }
+  /* Catch barcode messages from any older scanner implementation. */
+  window.addEventListener("message",function(event){
+    var data=event.data||{};
+    if(data.type==="foodlens-barcode" && data.barcode){
+      processBarcodeFixed(data.barcode);
     }
-  );
-
-  /*
-   * Short startup retry window.
-   */
-  var tries=0;
-
-  var timer =
-    setInterval(
-      function(){
-
-        install();
-
-        tries++;
-
-        if(tries>=30){
-          clearInterval(timer);
-        }
-
-      },
-      250
-    );
-
+  });
 })();
 </script>
