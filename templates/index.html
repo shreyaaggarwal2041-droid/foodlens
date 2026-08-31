@@ -15171,3 +15171,594 @@ window.displayProductForBarcode = displayProductForBarcode;
 
 })();
 </script>
+
+<script id="foodlensActualProductResultFix">
+(function(){
+  "use strict";
+
+  /*
+   * FINAL RESULT FIX
+   * ----------------
+   * The screenshot showed two separate problems:
+   * 1. Open Food Facts image_front_small_url was being written into a
+   *    text-only .productImage div, so the raw URL appeared on screen.
+   * 2. Different barcode/result patches were competing with each other,
+   *    so the result could show the product name while nutrition stayed "—".
+   *
+   * This patch makes ONE authoritative barcode -> API -> result route.
+   * It keeps the user's existing design and only fixes data rendering.
+   */
+
+  function homeFrame(){
+    return document.getElementById("frame-home")?.contentWindow || null;
+  }
+
+  function resultFrame(){
+    return document.getElementById("frame-result")?.contentWindow || null;
+  }
+
+  function digits(v){
+    return String(v || "").replace(/\D/g,"");
+  }
+
+  function validBarcode(v){
+    return [8,12,13,14].includes(String(v).length);
+  }
+
+  function language(){
+    return localStorage.getItem("foodlensLanguage")==="hi" ? "hi" : "en";
+  }
+
+  function number(v){
+    var n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function normalizeProduct(p, code){
+    p = p || {};
+    var n = p.nutriments || {};
+
+    var sugar = number(n.sugars_100g);
+    var sodium = number(n.sodium_100g);
+    var fibre = number(n.fiber_100g);
+    var protein = number(n.proteins_100g);
+
+    var grade =
+      String(
+        p.nutriscore_grade ||
+        p.nutrition_grades ||
+        ""
+      ).toLowerCase();
+
+    var scoreMap = {
+      a:"9.5",
+      b:"8.0",
+      c:"6.5",
+      d:"4.5",
+      e:"2.5"
+    };
+
+    var score = scoreMap[grade] || "—";
+
+    if(score === "—"){
+      var ns = number(p.nutriscore_score);
+
+      if(ns !== null){
+        score =
+          Math.max(
+            0,
+            Math.min(
+              10,
+              10 - ((ns + 15) / 50) * 10
+            )
+          ).toFixed(1);
+      }
+    }
+
+    return {
+      barcode:code,
+      name:
+        p.product_name ||
+        p.product_name_en ||
+        p.brands ||
+        ("Product " + code),
+
+      brand:
+        p.brands ||
+        "Food product",
+
+      image:
+        p.image_front_small_url ||
+        p.image_front_url ||
+        "",
+
+      score:score,
+
+      nutrition:{
+        sugar:
+          sugar === null
+            ? "—"
+            : sugar.toFixed(1) + "g",
+
+        sodium:
+          sodium === null
+            ? "—"
+            : Math.round(sodium) + "mg",
+
+        fibre:
+          fibre === null
+            ? "—"
+            : fibre.toFixed(1) + "g",
+
+        protein:
+          protein === null
+            ? "—"
+            : protein.toFixed(1) + "g"
+      },
+
+      ingredients:
+        p.ingredients_text ||
+        p.ingredients_text_en ||
+        ""
+    };
+  }
+
+  /*
+   * Patch the RESULT iframe so a URL becomes an actual image.
+   * The old implementation used innerText, which is exactly why the
+   * long Open Food Facts URL appeared across the page in the screenshot.
+   */
+  function patchResultRenderer(){
+
+    var rw = resultFrame();
+
+    if(!rw || !rw.document) return false;
+
+    var original =
+      rw.displayProduct;
+
+    if(typeof original !== "function") return false;
+
+    if(original.__foodlensImageFixInstalled){
+      return true;
+    }
+
+    function fixedDisplayProduct(product){
+
+      product = product || {};
+
+      /*
+       * Normalize flat nutrition objects too, so a competing older
+       * result route cannot leave the four cards blank.
+       */
+      if(!product.nutrition){
+        product.nutrition = {
+          sugar:
+            product.sugar ?? "—",
+          sodium:
+            product.sodium ?? "—",
+          fibre:
+            product.fibre ?? "—",
+          protein:
+            product.protein ?? "—"
+        };
+      }
+
+      /*
+       * Let the existing renderer populate all normal text fields.
+       */
+      try{
+        original(product);
+      }catch(error){
+        console.warn(
+          "Existing FoodLens renderer error:",
+          error
+        );
+      }
+
+      /*
+       * Then replace ONLY the image presentation.
+       */
+      var imageBox =
+        rw.document.getElementById(
+          "productImage"
+        );
+
+      if(!imageBox) return;
+
+      var image =
+        String(product.image || "");
+
+      imageBox.innerHTML = "";
+
+      if(
+        /^https?:\/\//i.test(image)
+      ){
+
+        var img =
+          rw.document.createElement("img");
+
+        img.src = image;
+        img.alt =
+          product.name ||
+          "Product image";
+
+        img.loading = "eager";
+
+        img.style.cssText =
+          "width:100%;height:100%;" +
+          "object-fit:contain;" +
+          "border-radius:16px;" +
+          "display:block;";
+
+        img.onerror =
+          function(){
+            imageBox.textContent = "🍽️";
+          };
+
+        imageBox.appendChild(img);
+
+      }else{
+
+        imageBox.textContent =
+          image || "🍽️";
+      }
+
+      /*
+       * Explicitly guarantee the nutrition values are visible.
+       */
+      var ids = {
+        sugar:product.nutrition.sugar ?? "—",
+        sodium:product.nutrition.sodium ?? "—",
+        fibre:product.nutrition.fibre ?? "—",
+        protein:product.nutrition.protein ?? "—"
+      };
+
+      Object.keys(ids).forEach(
+        function(id){
+          var el =
+            rw.document.getElementById(id);
+
+          if(el){
+            el.textContent =
+              ids[id];
+          }
+        }
+      );
+    }
+
+    fixedDisplayProduct.__foodlensImageFixInstalled = true;
+    fixedDisplayProduct.__foodlensOriginal = original;
+
+    rw.displayProduct =
+      fixedDisplayProduct;
+
+    return true;
+  }
+
+  /*
+   * ONE authoritative product lookup.
+   * This bypasses the older competing processBarcode/displayProductForBarcode
+   * versions that were causing inconsistent result objects.
+   */
+  function installHome(){
+
+    var w = homeFrame();
+
+    if(!w || !w.document) return false;
+
+    w.processBarcode = async function(value){
+
+      var code = digits(value);
+
+      if(!validBarcode(code)) return;
+
+      try{
+        localStorage.setItem(
+          "foodlensLastBarcode",
+          code
+        );
+      }catch(e){}
+
+      var rw = resultFrame();
+
+      /*
+       * Go to the existing result screen immediately.
+       */
+      try{
+        window.foodLensShow?.("result");
+      }catch(e){}
+
+      /*
+       * Show a temporary loading state using the SAME result card.
+       */
+      try{
+
+        patchResultRenderer();
+
+        if(
+          rw &&
+          typeof rw.displayProduct === "function"
+        ){
+
+          rw.displayProduct({
+            barcode:code,
+            name:
+              language()==="hi"
+                ? "उत्पाद की जानकारी लोड हो रही है…"
+                : "Loading product information…",
+
+            brand:
+              "Barcode: " + code,
+
+            image:"",
+
+            score:"—",
+
+            nutrition:{
+              sugar:"—",
+              sodium:"—",
+              fibre:"—",
+              protein:"—"
+            },
+
+            ingredients:""
+          });
+        }
+
+      }catch(e){}
+
+      var product = null;
+
+      try{
+
+        var response =
+          await fetch(
+            "https://world.openfoodfacts.org/api/v2/product/" +
+            encodeURIComponent(code) +
+            ".json?fields=" +
+            "code,product_name,product_name_en,brands," +
+            "image_front_small_url,image_front_url," +
+            "nutrition_grades,nutriscore_grade,nutriscore_score," +
+            "nutriments,ingredients_text,ingredients_text_en"
+          );
+
+        if(response.ok){
+
+          var data =
+            await response.json();
+
+          if(
+            data &&
+            data.status === 1 &&
+            data.product
+          ){
+            product =
+              normalizeProduct(
+                data.product,
+                code
+              );
+          }
+        }
+
+      }catch(error){
+
+        console.warn(
+          "FoodLens Open Food Facts lookup failed:",
+          error
+        );
+      }
+
+      if(!product){
+
+        product = {
+          barcode:code,
+
+          name:
+            language()==="hi"
+              ? "उत्पाद की जानकारी उपलब्ध नहीं है"
+              : "Product information unavailable",
+
+          brand:
+            "Barcode: " + code,
+
+          image:"",
+
+          score:"—",
+
+          nutrition:{
+            sugar:"—",
+            sodium:"—",
+            fibre:"—",
+            protein:"—"
+          },
+
+          ingredients:""
+        };
+      }
+
+      /*
+       * Save the scan without allowing an older route to overwrite
+       * the displayed values.
+       */
+      try{
+
+        var history =
+          JSON.parse(
+            localStorage.getItem(
+              "foodlensHistory"
+            ) || "[]"
+          );
+
+        if(!Array.isArray(history)){
+          history = [];
+        }
+
+        history =
+          history.filter(
+            function(item){
+              return !(
+                item &&
+                item.barcode === code
+              );
+            }
+          );
+
+        history.unshift({
+          name:product.name,
+          score:product.score,
+          barcode:code,
+          nutrition:product.nutrition,
+          date:new Date().toLocaleDateString()
+        });
+
+        localStorage.setItem(
+          "foodlensHistory",
+          JSON.stringify(
+            history.slice(0,20)
+          )
+        );
+
+      }catch(e){}
+
+      /*
+       * Final authoritative render.
+       */
+      patchResultRenderer();
+
+      setTimeout(
+        function(){
+
+          var current =
+            resultFrame();
+
+          if(
+            current &&
+            typeof current.displayProduct === "function"
+          ){
+
+            current.displayProduct(
+              product
+            );
+
+            var scanned =
+              current.document.getElementById(
+                "scannedBarcode"
+              );
+
+            if(scanned){
+              scanned.textContent =
+                (
+                  language()==="hi"
+                    ? "बारकोड: "
+                    : "Barcode: "
+                ) + code;
+            }
+          }
+
+        },
+        80
+      );
+    };
+
+    /*
+     * Keep all scanner entry points connected to the working scanner.
+     */
+    if(typeof w.foodLensOpenRealCamera === "function"){
+      w.openCamera =
+        w.foodLensOpenRealCamera;
+
+      w.openBarcode =
+        w.foodLensOpenRealCamera;
+    }
+
+    return true;
+  }
+
+  function install(){
+
+    installHome();
+    patchResultRenderer();
+
+    return true;
+  }
+
+  install();
+
+  var frame =
+    document.getElementById(
+      "frame-home"
+    );
+
+  if(frame){
+
+    frame.addEventListener(
+      "load",
+      function(){
+
+        install();
+
+        setTimeout(
+          install,
+          200
+        );
+
+        setTimeout(
+          install,
+          700
+        );
+
+        setTimeout(
+          install,
+          1500
+        );
+
+      }
+    );
+  }
+
+  var result =
+    document.getElementById(
+      "frame-result"
+    );
+
+  if(result){
+
+    result.addEventListener(
+      "load",
+      function(){
+
+        patchResultRenderer();
+
+        setTimeout(
+          patchResultRenderer,
+          200
+        );
+
+      }
+    );
+  }
+
+  /*
+   * Short retry window for iframe recreation.
+   */
+  var count = 0;
+
+  var timer =
+    setInterval(
+      function(){
+
+        count++;
+
+        install();
+
+        if(count >= 25){
+          clearInterval(timer);
+        }
+
+      },
+      300
+    );
+
+})();
+</script>
