@@ -225,26 +225,8 @@ h1{font-size:clamp(30px,5vw,48px);margin:8px 0 10px}
   width:64px;height:64px;border-radius:50%;background:var(--primary-light);color:var(--primary-dark);
   display:grid;place-items:center;font-size:25px;font-weight:800
 }
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 .stat{padding:18px;text-align:center}.stat b{font-size:27px;display:block}.stat span{color:var(--muted);font-size:13px}
-
-/* Global accessibility controls */
-.global-a11y{position:fixed;top:calc(10px + env(safe-area-inset-top));right:10px;z-index:900;display:flex;align-items:center;gap:6px;padding:7px;border:1px solid rgba(15,118,110,.18);border-radius:18px;background:rgba(255,255,255,.95);box-shadow:0 10px 28px rgba(20,45,40,.14);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
-.a11y-btn{min-width:40px;min-height:38px;padding:7px 10px;border:1px solid #dce7e3;border-radius:12px;background:#fff;color:#173f39;font:800 13px/1 inherit;cursor:pointer}
-.a11y-btn:hover{transform:translateY(-1px);border-color:#39AFA5}.a11y-btn:active{transform:scale(.97)}
-.a11y-btn.speak{background:#e4f6ef;color:#08735f}.a11y-btn.stop{background:#fff0ee;color:#a33d35}.a11y-size{min-width:42px;text-align:center;font-weight:900;font-size:12px;color:#596864}
-@media(max-width:480px){.global-a11y{left:10px;right:10px;top:calc(8px + env(safe-area-inset-top));justify-content:center;gap:5px}.a11y-btn{min-height:40px;padding:7px 9px}.a11y-btn.speak,.a11y-btn.stop{flex:1}}
-@media(max-width:360px){.a11y-btn.speak span,.a11y-btn.stop span{display:none}.global-a11y{gap:4px}.a11y-size{min-width:38px}}
-
-/* Language is always available on every main-app screen. */
-.global-language{display:inline-flex;align-items:center;gap:3px;padding:3px 6px;border:1px solid rgba(11,122,117,.18);background:#fff;border-radius:999px;box-shadow:0 4px 12px rgba(16,45,40,.06);flex-shrink:0}
-.global-language-icon{font-size:14px;line-height:1}
-.global-lang-btn{border:0;background:transparent;color:#68736f;font:800 11px/1 inherit;padding:7px 7px;border-radius:999px;cursor:pointer;transition:.18s ease}
-.global-lang-btn:hover{background:#eef8f5;color:#075e5a}
-.global-lang-btn.active{background:var(--primary);color:#fff;box-shadow:0 3px 8px rgba(11,122,117,.2)}
-.global-lang-divider{color:#b6c3bf;font-size:11px}
-@media(max-width:480px){.global-language{order:-1}.global-a11y{flex-wrap:wrap}.global-lang-btn{padding:7px 6px}}
-@media(max-width:360px){.global-language-icon{display:none}.global-lang-btn{font-size:10px;padding:7px 5px}}
 
 /* Bottom navigation */
 .bottom-nav{
@@ -587,73 +569,6 @@ button.primary:hover{
 .reading-indicator{position:fixed;right:20px;bottom:90px;z-index:150;background:var(--text);color:#fff;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:800;box-shadow:0 8px 25px rgba(0,0,0,.18);}
 @media(max-width:650px){.fact-grid{grid-template-columns:1fr}.ingredient-row{grid-template-columns:1fr;gap:4px}.fact-hero{align-items:flex-start}.did-subtitle{padding-left:0}.welcome-card{padding:38px 20px}.hero h2{font-size:34px}.bottom-nav{padding-left:6px;padding-right:6px}.nav-btn{font-size:10px;padding:8px 3px;}}
 
-
-/* ---------- FoodLens brand + interactive welcome polish ---------- */
-:root{
-  --primary:#18a999;
-  --primary-dark:#08786f;
-  --primary-light:#dff7f2;
-  --accent:#ffd84d;
-  --accent-2:#ff8a34;
-  --ink:#151918;
-  --cream:#fff9e8;
-}
-body{background:var(--cream)}
-.welcome{
-  min-height:100vh;
-  padding:20px 18px 34px;
-  background:
-    radial-gradient(circle at 12% 8%,rgba(24,169,153,.16),transparent 23%),
-    radial-gradient(circle at 88% 28%,rgba(255,216,77,.24),transparent 27%),
-    linear-gradient(180deg,#fffdf4 0%,#fff9e8 100%);
-}
-.welcome-card{
-  width:min(720px,100%);
-  padding:30px 24px 28px;
-  border:1px solid rgba(24,169,153,.16);
-  border-radius:34px;
-  background:rgba(255,255,255,.76);
-  backdrop-filter:blur(14px);
-  box-shadow:0 28px 80px rgba(21,65,59,.15);
-}
-.brand-lockup{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:12px}
-.welcome-card .logo{
-  position:relative;width:52px;height:52px;border-radius:17px;margin:0;
-  background:linear-gradient(145deg,#1bb9a6,#08786f);
-  box-shadow:0 8px 18px rgba(8,120,111,.25),inset 0 1px 0 rgba(255,255,255,.45);
-  font-size:20px;transform:rotate(-4deg);transition:transform .25s ease,box-shadow .25s ease;
-}
-.welcome-card .logo:hover{transform:rotate(0deg) scale(1.06);box-shadow:0 12px 25px rgba(8,120,111,.32)}
-.logo span{position:relative;z-index:2}.logo i{position:absolute;right:6px;top:4px;font-style:normal;font-size:15px;color:#ffe16b;transform:rotate(-25deg)}
-.wordmark{font-size:27px;line-height:1;font-weight:950;letter-spacing:.08em;color:#171a19}.wordmark span{color:#19a99a}
-.welcome-kicker{display:inline-block;color:#138f84;font-size:11px;font-weight:900;letter-spacing:.22em;margin-bottom:9px}
-.welcome-card h1{font-size:clamp(38px,9vw,58px);line-height:.94;letter-spacing:-.055em;margin:4px 0 12px;font-weight:950}
-.welcome-card h1 span{color:#19a99a}
-.welcome-card .subtitle{font-size:15px;line-height:1.5;max-width:460px;margin-bottom:10px;color:#65716e}
-.welcome-illustration{position:relative;width:min(470px,100%);height:260px;margin:2px auto 10px;overflow:visible}
-.orbit{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none}
-.orbit-one{width:225px;height:225px;background:#ffdc4f;box-shadow:0 18px 40px rgba(255,197,47,.18)}
-.orbit-two{width:280px;height:280px;border:2px dashed rgba(24,169,153,.18);animation:spin 18s linear infinite}
-@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
-.phone-illustration{position:absolute;z-index:5;left:50%;top:5px;width:132px;height:238px;transform:translateX(-50%) rotate(5deg);border:7px solid #171918;border-radius:28px;background:#fff9e8;padding:18px 10px 12px;text-align:center;box-shadow:0 18px 35px rgba(20,30,28,.2);transition:transform .3s ease}
-.phone-illustration:hover{transform:translateX(-50%) rotate(1deg) translateY(-5px)}
-.phone-notch{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:38px;height:5px;border-radius:20px;background:#171918}
-.phone-brand{font-size:8px;font-weight:950;letter-spacing:.1em;margin-top:4px}.phone-food{font-size:31px;margin-top:30px}.phone-score{font-size:30px;font-weight:950;color:#19a36e;line-height:1.05}.phone-label{font-size:6px;font-weight:950;letter-spacing:.08em}.phone-bars{display:flex;gap:4px;justify-content:center;margin-top:13px}.phone-bars b{display:block;width:23px;height:5px;border-radius:5px;background:#19a99a}.phone-bars b:nth-child(2){background:#ffd84d}.phone-bars b:nth-child(3){background:#ff8a34}
-.person-illustration{position:absolute;bottom:0;width:76px;height:142px;z-index:7}.person-left{left:0}.person-right{right:0;transform:scaleX(-1)}
-.person-illustration .head{position:absolute;left:11px;top:7px;width:55px;height:55px;border-radius:50%;background:#f47b20;box-shadow:inset 0 -3px 0 rgba(0,0,0,.06)}
-.person-illustration .hair{position:absolute;left:11px;top:7px;width:55px;height:25px;background:#171918;border-radius:55px 55px 8px 8px;z-index:2}
-.person-illustration .body{position:absolute;left:0;bottom:0;width:76px;height:78px;background:#3bb2a6;border-radius:43px 43px 8px 8px}
-.person-illustration .hand{position:absolute;right:-4px;top:82px;width:25px;height:14px;border-radius:20px;background:#f47b20;transform:rotate(-22deg);z-index:3}
-.food-float{position:absolute;z-index:12;font-size:30px;filter:drop-shadow(0 5px 5px rgba(0,0,0,.08));animation:foodBob 3.4s ease-in-out infinite}
-.food-a{left:7%;top:30px}.food-b{right:7%;top:48px;animation-delay:.5s}.food-c{left:16%;bottom:8px;animation-delay:1s}.food-d{right:13%;bottom:5px;animation-delay:1.5s}
-@keyframes foodBob{0%,100%{transform:translateY(0) rotate(-5deg)}50%{transform:translateY(-9px) rotate(6deg)}}
-.lang-row{margin:5px 0 12px}.lang{border:1.5px solid #cbded9;background:#fff;border-radius:999px;padding:10px 18px;font-weight:850;transition:.2s ease}.lang:hover{transform:translateY(-2px);border-color:#18a999}.lang.active{background:#dff7f2;border-color:#18a999;color:#08786f;box-shadow:0 5px 14px rgba(24,169,153,.13)}
-.welcome-access{margin:8px 0 14px}.accessibility-btn{border:1.5px solid #d4dfdc;background:#fff;border-radius:13px;transition:.2s ease}.accessibility-btn:hover{transform:translateY(-2px);border-color:#18a999;box-shadow:0 6px 15px rgba(20,80,70,.1)}
-#startBtn{background:linear-gradient(135deg,#20b4a2,#0c857b);color:#fff;border-radius:16px;min-height:58px;box-shadow:0 7px 0 #086c64,0 15px 28px rgba(8,120,111,.2);transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}
-#startBtn:hover{filter:saturate(1.08) brightness(1.03);transform:translateY(-2px);box-shadow:0 9px 0 #086c64,0 19px 32px rgba(8,120,111,.24)}
-#startBtn:active{transform:translateY(4px);box-shadow:0 3px 0 #086c64,0 7px 15px rgba(8,120,111,.18)}
-@media(max-width:520px){.welcome{padding:12px 12px 26px}.welcome-card{padding:24px 15px 22px;border-radius:28px}.wordmark{font-size:23px}.welcome-card h1{font-size:42px}.welcome-illustration{height:238px;margin-top:0}.orbit-one{width:205px;height:205px}.orbit-two{width:252px;height:252px}.phone-illustration{width:122px;height:220px}.person-illustration{transform:scale(.88);transform-origin:bottom left}.person-right{transform:scaleX(-1) scale(.88)}.food-float{font-size:26px}.food-a{left:2%}.food-b{right:2%}.food-c{left:10%}.food-d{right:7%}}
-
 /* ---------- Colour sensitivity: meaning + text, not colour alone ---------- */
 .nutrient.nutrient-high{
   border-color:#efb4b0;
@@ -698,22 +613,10 @@ body{background:var(--cream)}
   <!-- WELCOME -->
   <section id="welcomeScreen" class="welcome">
     <div class="welcome-card card">
-      <div class="brand-lockup" aria-label="FoodLens">
-        <div class="logo"><span>FL</span><i>⌁</i></div>
-        <div class="wordmark">FOOD<span>LENS</span></div>
-      </div>
-      <div class="welcome-kicker">SMART FOOD GUIDANCE</div>
-      <h1>Know your food.<br><span>Choose better.</span></h1>
-      <p class="subtitle">Understand what is on the label — simply, clearly and in your language.</p>
-
-      <div class="welcome-illustration" aria-hidden="true">
-        <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
-        <div class="food-float food-a">🍎</div><div class="food-float food-b">🥦</div>
-        <div class="food-float food-c">🍪</div><div class="food-float food-d">🥛</div>
-        <div class="person-illustration person-left"><div class="head"></div><div class="hair"></div><div class="body"></div><div class="hand"></div></div>
-        <div class="person-illustration person-right"><div class="head"></div><div class="hair"></div><div class="body"></div><div class="hand"></div></div>
-        <div class="phone-illustration"><div class="phone-notch"></div><div class="phone-brand">FOODLENS</div><div class="phone-food">🍪</div><div class="phone-score">7.2</div><div class="phone-label">FOODLENS SCORE</div><div class="phone-bars"><b></b><b></b><b></b></div></div>
-      </div>
+      <div class="logo">FL</div>
+      <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:var(--primary);text-transform:uppercase;margin-bottom:6px">Smart food guidance</div>
+      <h1>FoodLens</h1>
+      <p class="subtitle">Know your food. Choose better.</p>
 
       <div class="lang-row">
         <button class="lang active" data-lang="en">English</button>
@@ -977,20 +880,6 @@ body{background:var(--cream)}
       </div>
     </main>
 
-    <div id="globalA11y" class="global-a11y" aria-label="Accessibility and language controls">
-      <div class="global-language" role="group" aria-label="Language">
-        <span class="global-language-icon" aria-hidden="true">🌐</span>
-        <button id="globalLangEn" class="global-lang-btn active" type="button" data-global-lang="en">EN</button>
-        <span class="global-lang-divider" aria-hidden="true">|</span>
-        <button id="globalLangHi" class="global-lang-btn" type="button" data-global-lang="hi">हिन्दी</button>
-      </div>
-      <button id="globalFontMinus" class="a11y-btn" type="button" aria-label="Decrease text size">A−</button>
-      <span id="globalFontValue" class="a11y-size">100%</span>
-      <button id="globalFontPlus" class="a11y-btn" type="button" aria-label="Increase text size">A+</button>
-      <button id="globalSpeak" class="a11y-btn speak" type="button" aria-label="Read aloud">🔊 <span id="globalSpeakText">Read aloud</span></button>
-      <button id="globalStop" class="a11y-btn stop" type="button" aria-label="Stop audio">■ <span id="globalStopText">Stop audio</span></button>
-    </div>
-
     <nav class="bottom-nav">
       <button class="nav-btn active" data-screen="homeScreen">🏠<br>Home</button>
       <button class="nav-btn" data-screen="historyScreen">🕘<br>History</button>
@@ -1088,7 +977,7 @@ let currentStream = null;
 let scannerRunning = false;
 let barcodeDetector = null;
 let scanLoopId = null;
-let currentLanguage = (()=>{ try{return localStorage.getItem("foodlens_language") || "en";}catch(e){return "en";} })();
+let currentLanguage = "en";
 
 /* ---------- Local storage ---------- */
 
@@ -1140,7 +1029,7 @@ const languageText = {
     welcomeSubtitle:"Know your food. Choose better.",
     welcomeDescription:"Scan a barcode or enter it manually to view nutritional guidance.",
     smartGuidance:"Smart food guidance",
-    readAloud:"Read aloud", stopAudio:"Stop audio", increaseText:"Increase text size", decreaseText:"Decrease text size",
+    readAloud:"Read aloud",
     home:"Home", history:"History", didYouKnow:"Did You Know", profile:"Profile",
     knowFood:"Know what's in your food.",
     heroText:"Scan a product barcode to get its FoodLens Score, nutrient breakdown and an easy-to-understand recommendation.",
@@ -1190,7 +1079,7 @@ const languageText = {
     welcomeSubtitle:"अपने भोजन को जानें। बेहतर चुनें।",
     welcomeDescription:"पोषण संबंधी जानकारी देखने के लिए बारकोड स्कैन करें या उसे मैन्युअल रूप से दर्ज करें।",
     smartGuidance:"स्मार्ट फूड गाइडेंस",
-    readAloud:"पढ़कर सुनाएँ", stopAudio:"ऑडियो रोकें", increaseText:"टेक्स्ट बड़ा करें", decreaseText:"टेक्स्ट छोटा करें",
+    readAloud:"पढ़कर सुनाएँ",
     home:"होम", history:"इतिहास", didYouKnow:"क्या आप जानते हैं?", profile:"प्रोफ़ाइल",
     knowFood:"जानिए आपके भोजन में क्या है।",
     heroText:"उत्पाद का बारकोड स्कैन करके FoodLens स्कोर, पोषक तत्वों की जानकारी और आसान सुझाव पाएँ।",
@@ -1241,12 +1130,6 @@ function setText(selector, value){ const el=$(selector); if(el && value !== unde
 function applyLanguage(){
   const t=languageText[currentLanguage];
   document.documentElement.lang=currentLanguage === "hi" ? "hi" : "en";
-  document.querySelectorAll(".lang").forEach(x=>x.classList.toggle("active",x.dataset.lang===currentLanguage));
-  const glEn=$("globalLangEn"), glHi=$("globalLangHi");
-  if(glEn) glEn.classList.toggle("active", currentLanguage === "en");
-  if(glHi) glHi.classList.toggle("active", currentLanguage === "hi");
-  if(glEn) glEn.setAttribute("aria-pressed", currentLanguage === "en" ? "true" : "false");
-  if(glHi) glHi.setAttribute("aria-pressed", currentLanguage === "hi" ? "true" : "false");
   setText("startBtn",t.start);
   setText("welcomeSpeakBtn", "🔊 " + t.readAloud);
   const subtitle=document.querySelector(".welcome-card .subtitle"); if(subtitle) subtitle.textContent=t.welcomeSubtitle;
@@ -1302,32 +1185,18 @@ function applyLanguage(){
   const st=$("supportTitle"); if(st)st.textContent=currentLanguage==="hi"?"FoodLens टेक सपोर्ट":"FoodLens Tech Support";
   const sp=document.querySelector("#supportModal > .modal-card > p"); if(sp)sp.textContent=currentLanguage==="hi"?"अगर कुछ काम नहीं कर रहा है, तो प्रोजेक्ट टीम से संपर्क करने से पहले ये आसान जाँच करें।":"If something is not working, try these quick checks before contacting the project team.";
   setText("copySupportInfo",currentLanguage==="hi"?"सपोर्ट जानकारी कॉपी करें":"Copy support information");
-  setText("globalSpeakText",t.readAloud);
-  setText("globalStopText",t.stopAudio);
-  const langGroup=document.querySelector(".global-language");
-  if(langGroup) langGroup.setAttribute("aria-label", currentLanguage === "hi" ? "भाषा चुनें" : "Choose language");
-  const glEn2=$("globalLangEn"), glHi2=$("globalLangHi");
-  if(glEn2) glEn2.setAttribute("aria-label", currentLanguage === "hi" ? "अंग्रेज़ी चुनें" : "Choose English");
-  if(glHi2) glHi2.setAttribute("aria-label", currentLanguage === "hi" ? "हिन्दी चुनें" : "Choose Hindi");
-  const gs=$("globalSpeak"); if(gs) gs.setAttribute("aria-label",t.readAloud);
-  const gst=$("globalStop"); if(gst) gst.setAttribute("aria-label",t.stopAudio);
-  const gfp=$("globalFontPlus"); if(gfp) gfp.setAttribute("aria-label",t.increaseText);
-  const gfm=$("globalFontMinus"); if(gfm) gfm.setAttribute("aria-label",t.decreaseText);
 }
 
-/* Accessibility text size: applies consistently across every app screen */
-let textScale=Number(localStorage.getItem("foodlens_text_scale")||"1");
-function applyTextScale(){
-  textScale=Math.min(1.25,Math.max(.9,textScale));
-  document.querySelectorAll(".screen, #welcomeScreen").forEach(el=>{el.style.zoom=textScale;});
-  const pct=Math.round(textScale*100)+"%"; setText("fontSizeValue",pct); setText("globalFontValue",pct);
-}
-function changeTextScale(delta){textScale=Math.min(1.25,Math.max(.9,+(textScale+delta).toFixed(2)));localStorage.setItem("foodlens_text_scale",textScale);applyTextScale();}
-$("fontMinusBtn").addEventListener("click",()=>changeTextScale(-.05));
-$("fontPlusBtn").addEventListener("click",()=>changeTextScale(.05));
-$("globalFontMinus").addEventListener("click",()=>changeTextScale(-.05));
-$("globalFontPlus").addEventListener("click",()=>changeTextScale(.05));
-applyTextScale();
+document.querySelectorAll(".lang").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".lang").forEach(x=>x.classList.remove("active"));
+    btn.classList.add("active");
+    currentLanguage = btn.dataset.lang;
+    applyLanguage();
+    window.speechSynthesis?.cancel();
+    toast(currentLanguage === "hi" ? "भाषा हिन्दी चुनी गई है।" : "English selected.");
+  });
+});
 
 /* ---------- Start ---------- */
 
@@ -1769,6 +1638,26 @@ $("speakBtn").addEventListener("click",speakCurrentPage);
 
 /* ---------- Welcome accessibility & product-result feedback ---------- */
 
+$("welcomeSpeakBtn")?.addEventListener("click",()=>{ speakText(languageText[currentLanguage].welcomeAudio); });
+
+let fontScale = 1;
+
+function applyFontScale(){
+  document.documentElement.style.setProperty("--font-scale", fontScale);
+  document.body.style.fontSize = (16 * fontScale) + "px";
+  if($("fontSizeValue")) $("fontSizeValue").textContent = Math.round(fontScale * 100) + "%";
+}
+
+$("fontMinusBtn").addEventListener("click",()=>{
+  fontScale = Math.max(0.85, +(fontScale - 0.05).toFixed(2));
+  applyFontScale();
+});
+
+$("fontPlusBtn").addEventListener("click",()=>{
+  fontScale = Math.min(1.35, +(fontScale + 0.05).toFixed(2));
+  applyFontScale();
+});
+
 let selectedResultFeedback = "";
 
 document.querySelectorAll("[data-result-feedback]").forEach(btn=>{
@@ -1827,7 +1716,7 @@ $("sendFeedback").addEventListener("click",()=>{
   const type = window.__selectedFeedback || "General feedback";
   const text = $("feedbackText").value.trim();
   if(!text && type === "General feedback"){
-    toast(currentLanguage === "hi" ? "कृपया रेटिंग चुनें या अपनी प्रतिक्रिया लिखें।" : "Please select a rating or write some feedback.");
+    toast("Please select a rating or write some feedback.");
     return;
   }
   const payload = ["FoodLens Feedback","Rating: " + type,"Comment: " + (text || "No additional comment.")].join("\n");
@@ -1836,7 +1725,7 @@ $("sendFeedback").addEventListener("click",()=>{
   document.querySelectorAll("[data-feedback]").forEach(x=>x.classList.remove("active"));
   window.__selectedFeedback = "";
   closeModal("feedbackModal");
-  toast(currentLanguage === "hi" ? "धन्यवाद — आपकी प्रतिक्रिया इस डिवाइस पर दर्ज कर ली गई है।" : "Thank you — your feedback has been recorded on this device.");
+  toast("Thank you — your feedback has been recorded on this device.");
 });
 
 $("supportBtn").addEventListener("click",()=>openModal("supportModal"));
@@ -1846,131 +1735,66 @@ $("copySupportInfo").addEventListener("click",async()=>{
   const info = ["FoodLens Tech Support","Browser: " + navigator.userAgent,"Page: " + window.location.href,"Time: " + new Date().toISOString()].join("\n");
   try{
     await navigator.clipboard.writeText(info);
-    $("supportStatus").textContent = currentLanguage === "hi" ? "सपोर्ट जानकारी कॉपी हो गई है।" : "Support information copied.";
+    $("supportStatus").textContent = "Support information copied. You can paste it into your project team's support chat/email.";
   }catch(e){
     $("supportStatus").textContent = info;
   }
 });
-
-function stopAudio(){
-  if("speechSynthesis" in window) speechSynthesis.cancel();
-  const indicator=$("readingIndicator"); if(indicator) indicator.remove();
-}
-
-/*
-  READ ALOUD UX:
-  Speak the text that is actually visible on the current screen.
-  We deliberately do NOT use a fixed paragraph, so product results,
-  history, facts, profile, scanner instructions, etc. are read as shown.
-*/
-function getCurrentReadableScreen(){
-  const welcome=$("welcomeScreen");
-  if(welcome && !welcome.classList.contains("hidden")) return welcome;
-
-  const screens=["homeScreen","scannerScreen","resultScreen","historyScreen","didYouKnowScreen","profileScreen"];
-  for(const id of screens){
-    const el=$(id);
-    if(el && !el.classList.contains("hidden")) return el;
-  }
-  return null;
-}
-
-function getVisibleTextForSpeech(screen){
-  if(!screen) return "";
-  const clone=screen.cloneNode(true);
-
-  // Remove elements that are not content the user sees/needs spoken.
-  clone.querySelectorAll("script,style,[aria-hidden='true']").forEach(el=>el.remove());
-
-  return (clone.innerText || clone.textContent || "")
-    .replace(/\s+/g," ")
-    .trim();
-}
-
-function chooseSpeechVoice(lang){
-  if(!("speechSynthesis" in window)) return null;
-  const voices=speechSynthesis.getVoices ? speechSynthesis.getVoices() : [];
-  const prefix=lang.split("-")[0].toLowerCase();
-  return voices.find(v=>String(v.lang).toLowerCase()===lang.toLowerCase()) ||
-         voices.find(v=>String(v.lang).toLowerCase().startsWith(prefix)) || null;
-}
 
 function speakCurrentPage(){
   if(!("speechSynthesis" in window)){
     toast(currentLanguage === "hi" ? "इस डिवाइस पर पढ़कर सुनाना उपलब्ध नहीं है।" : "Read aloud is not available on this device.");
     return;
   }
-
-  const screen=getCurrentReadableScreen();
-  const text=getVisibleTextForSpeech(screen);
+  const active = document.querySelector(".screen:not(.hidden)");
+  let text = active ? active.innerText.replace(/\s+/g," ").trim() : "";
   if(!text){
-    toast(currentLanguage === "hi" ? "इस स्क्रीन पर पढ़ने के लिए कोई टेक्स्ट नहीं है।" : "There is no text to read on this screen.");
-    return;
+    text = currentLanguage === "hi" ? "फूड लेंस में आपका स्वागत है।" : "Welcome to FoodLens.";
   }
-
-  stopAudio();
-
-  const lang=currentLanguage === "hi" ? "hi-IN" : "en-IN";
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang=lang;
-  u.rate=.92;
-  u.pitch=1;
-  const voice=chooseSpeechVoice(lang);
-  if(voice) u.voice=voice;
-
-  const indicator=document.createElement("div");
-  indicator.className="reading-indicator";
-  indicator.id="readingIndicator";
-  indicator.textContent=currentLanguage === "hi" ? "🔊 स्क्रीन का टेक्स्ट पढ़ा जा रहा है…" : "🔊 Reading this screen…";
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = currentLanguage === "hi" ? "hi-IN" : "en-IN";
+  u.rate = .92;
+  const indicator = document.createElement("div");
+  indicator.className = "reading-indicator";
+  indicator.textContent = currentLanguage === "hi" ? "🔊 पढ़कर सुना रहे हैं…" : "🔊 Reading aloud…";
+  indicator.id = "readingIndicator";
   document.body.appendChild(indicator);
-
-  u.onend=()=>{const el=$("readingIndicator");if(el)el.remove();};
-  u.onerror=()=>{const el=$("readingIndicator");if(el)el.remove();};
+  u.onend = u.onerror = ()=>indicator.remove();
   speechSynthesis.speak(u);
 }
 
-function speakDidYouKnow(){ speakCurrentPage(); }
 
-$("welcomeSpeakBtn")?.addEventListener("click",speakCurrentPage);
-$("globalSpeak")?.addEventListener("click",speakCurrentPage);
-$("speakBtn")?.addEventListener("click",speakCurrentPage);
-$("speakFacts")?.addEventListener("click",speakCurrentPage);
-$("speakFactsBottom")?.addEventListener("click",speakCurrentPage);
-$("readAloudProfile")?.addEventListener("click",speakCurrentPage);
-$("globalStop")?.addEventListener("click",stopAudio);
+$("readAloudProfile").addEventListener("click",speakCurrentPage);
 
-/* One language handler only: changing language stops old audio immediately. */
-document.querySelectorAll(".lang").forEach(btn=>{
-  btn.addEventListener("click",()=>{
-    stopAudio();
-    document.querySelectorAll(".lang").forEach(x=>x.classList.remove("active"));
-    btn.classList.add("active");
-    currentLanguage=btn.dataset.lang;
-    try{localStorage.setItem("foodlens_language",currentLanguage);}catch(e){}
-    applyLanguage();
-    toast(currentLanguage === "hi" ? "भाषा हिन्दी में बदल दी गई है।" : "Language changed to English.");
-  });
+$("languageBtn").addEventListener("click",()=>{
+  const next = currentLanguage === "en" ? "hi" : "en";
+  currentLanguage = next;
+  document.querySelectorAll(".lang").forEach(x=>x.classList.toggle("active",x.dataset.lang === currentLanguage));
+  applyLanguage();
+  window.speechSynthesis?.cancel();
+  toast(currentLanguage === "hi" ? "भाषा हिन्दी में बदल दी गई है।" : "Language changed to English.");
 });
 
-/* Global language controls are available on every main-app screen. */
-["globalLangEn","globalLangHi"].forEach(id=>{
-  $(id)?.addEventListener("click",()=>{
-    const next=$(id).dataset.globalLang;
-    const btn=document.querySelector(`.lang[data-lang="${next}"]`);
-    if(btn){ btn.click(); return; }
-    stopAudio();
-    currentLanguage=next;
-    try{localStorage.setItem("foodlens_language",currentLanguage);}catch(e){}
-    applyLanguage();
-  });
-});
 
-/* Profile language button toggles the same selected language control. */
-$("languageBtn")?.addEventListener("click",()=>{
-  const next=currentLanguage === "en" ? "hi" : "en";
-  const btn=document.querySelector(`.lang[data-lang="${next}"]`);
-  if(btn) btn.click();
-});
+function speakDidYouKnow(){
+  const screen=$("didYouKnowScreen");
+  if(!screen) return;
+  speakText(screen.innerText);
+}
+function speakText(text){
+  if(!("speechSynthesis" in window)){toast("Read aloud is not supported in this browser.");return;}
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(String(text).replace(/\s+/g," ").trim());
+  u.lang=currentLanguage === "hi" ? "hi-IN" : "en-IN";
+  u.rate=.92;
+  const old=$("readingIndicator"); if(old) old.remove();
+  const indicator=document.createElement("div"); indicator.id="readingIndicator"; indicator.className="reading-indicator"; indicator.textContent=currentLanguage === "hi" ? "🔊 पढ़कर सुना रहे हैं…" : "🔊 Reading aloud…"; document.body.appendChild(indicator);
+  u.onend=u.onerror=()=>{if($("readingIndicator")) $("readingIndicator").remove()};
+  speechSynthesis.speak(u);
+}
+$("speakFacts")?.addEventListener("click",speakDidYouKnow);
+$("speakFactsBottom")?.addEventListener("click",speakDidYouKnow);
 
 document.querySelectorAll(".modal").forEach(modal=>{
   modal.addEventListener("click",e=>{ if(e.target === modal) modal.classList.add("hidden"); });
@@ -2003,3 +1827,4 @@ updateProfile();
 </script>
 </body>
 </html>
+
